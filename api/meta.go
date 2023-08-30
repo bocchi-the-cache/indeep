@@ -1,14 +1,18 @@
 package api
 
-import "encoding"
-
-type MetaPartitionID interface {
-	encoding.BinaryMarshaler
-	encoding.BinaryUnmarshaler
-
+type MetaKey interface {
 	ClientID() string
 	Bucket() string
 	Key() string
+}
+
+type MetaPartition interface {
+	StartKey() string
+	EndKey() string
+	KeyCount() int
+
+	Get(key string) (Metadata, error)
+	Put(key string, m Metadata) error
 }
 
 type Metadata interface {
@@ -21,10 +25,5 @@ type Metadata interface {
 }
 
 type MetaService interface {
-	Get(id MetaPartitionID) (MetaPartition, error)
-}
-
-type MetaPartition interface {
-	Get(id MetaPartitionID) (Metadata, error)
-	Put(id MetaPartitionID, m Metadata) error
+	Lookup(key MetaKey) (MetaPartition, error)
 }

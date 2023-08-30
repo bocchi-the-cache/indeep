@@ -1,11 +1,6 @@
 package api
 
-import "encoding"
-
-type DataPartitionID interface {
-	encoding.BinaryMarshaler
-	encoding.BinaryUnmarshaler
-}
+type DataPartitionID interface{}
 
 type DataService interface{}
 

@@ -1,6 +1,9 @@
 package api
 
 type Placer interface {
-	Meta(id MetaPartitionID) (MetaService, error)
-	Data(id DataPartitionID) (DataService, error)
+	LookupMetaClient(key MetaKey) (MetaService, error)
+	AddMetaServer( /* TODO */ ) error
+
+	LookupDataClient(id DataPartitionID) (DataService, error)
+	AddDataServer( /* TODO */ ) error
 }

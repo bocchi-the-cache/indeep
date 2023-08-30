@@ -1,12 +1,16 @@
 package metasvc
 
 import (
+	"net/http"
+
 	"github.com/bocchi-the-cache/indeep/api"
 )
 
-type client struct{}
+type client struct {
+	h *http.Client
+}
 
-func (c *client) Get(id api.MetaPartitionID) (api.MetaPartition, error) {
+func (c *client) Lookup(key api.MetaKey) (api.MetaPartition, error) {
 	//TODO implement me
 	panic("implement me")
 }
