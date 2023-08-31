@@ -20,42 +20,46 @@ type GatewayConfig struct {
 }
 
 type gateway struct {
-	c *GatewayConfig
-	h *http.Server
+	config *GatewayConfig
+	server *http.Server
 
 	placerCl api.Placer
 	metaCl   api.MetaService
 	dataCl   api.DataService
 }
 
-func NewGateway(c *GatewayConfig) api.App { return &gateway{c: c} }
+func NewGateway(c *GatewayConfig) api.App { return &gateway{config: c} }
 func Gateway() api.App                    { return NewGateway(new(GatewayConfig)) }
 
 func (*gateway) Name() string { return "gateway" }
 
 func (g *gateway) DefineFlags(f *flag.FlagSet) {
-	f.StringVar(&g.c.Host, "host", DefaultGatewayHost, "listen host")
-	f.StringVar(&g.c.rawPlacerPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
+	f.StringVar(&g.config.Host, "host", DefaultGatewayHost, "listen host")
+	f.StringVar(&g.config.rawPlacerPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
 }
 
 func (g *gateway) Initialize() error {
-	ps, err := peers.ParsePeers(g.c.rawPlacerPeers)
+	if g.config.Placer.Peers == nil {
+		ps, err := peers.ParsePeers(g.config.rawPlacerPeers)
+		if err != nil {
+			return err
+		}
+		g.config.Placer.Peers = ps
+	}
+
+	placerCl, err := clients.NewPlacer(&g.config.Placer)
 	if err != nil {
 		return err
 	}
-	g.c.Placer.Peers = ps
-
-	if g.placerCl, err = clients.NewPlacer(&g.c.Placer); err != nil {
-		return err
-	}
+	g.placerCl = placerCl
 
 	// TODO
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
-	g.h = &http.Server{Addr: g.c.Host, Handler: mux}
+	g.server = &http.Server{Addr: g.config.Host, Handler: mux}
 
 	return nil
 }
 
-func (g *gateway) Run() error                         { return g.h.ListenAndServe() }
-func (g *gateway) Shutdown(ctx context.Context) error { return g.h.Shutdown(ctx) }
+func (g *gateway) Run() error                         { return g.server.ListenAndServe() }
+func (g *gateway) Shutdown(ctx context.Context) error { return g.server.Shutdown(ctx) }

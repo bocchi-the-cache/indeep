@@ -36,36 +36,38 @@ type PlacerConfig struct {
 }
 
 type placerServer struct {
-	c   *PlacerConfig
-	h   *http.Server
-	fsm *placerFSM
+	config *PlacerConfig
+	server *http.Server
+	fsm    *placerFSM
 }
 
-func NewPlacer(c *PlacerConfig) api.App { return &placerServer{c: c} }
+func NewPlacer(c *PlacerConfig) api.App { return &placerServer{config: c} }
 func Placer() api.App                   { return NewPlacer(new(PlacerConfig)) }
 
 func (*placerServer) Name() string { return "placer" }
 
 func (s *placerServer) DefineFlags(f *flag.FlagSet) {
-	f.StringVar((*string)(&s.c.ID), "id", DefaultPlacerID, "placer ID")
-	f.StringVar(&s.c.rawPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
+	f.StringVar((*string)(&s.config.ID), "id", DefaultPlacerID, "placer ID")
+	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
 }
 
 func (s *placerServer) Initialize() error {
-	ps, err := peers.ParsePeers(s.c.rawPeers)
-	if err != nil {
-		return err
+	if s.config.Peers == nil {
+		ps, err := peers.ParsePeers(s.config.rawPeers)
+		if err != nil {
+			return err
+		}
+		s.config.Peers = ps
 	}
-	s.c.Peers = ps
 
-	p := ps.Lookup(s.c.ID)
+	p := s.config.Peers.Lookup(s.config.ID)
 	if p == nil {
-		return fmt.Errorf("%w: id=%s", ErrPlacerUnknownID, s.c.ID)
+		return fmt.Errorf("%w: id=%s", ErrPlacerUnknownID, s.config.ID)
 	}
 
 	// TODO
 	s.fsm = &placerFSM{
-		peers:    ps,
+		peers:    s.config.Peers,
 		self:     p,
 		leader:   p,
 		isLeader: true,
@@ -78,13 +80,13 @@ func (s *placerServer) Initialize() error {
 	mux.HandleFunc(peers.OperationAddMetaService, s.AddMetaService)
 	mux.HandleFunc(peers.OperationLookupDataService, s.LookupDataService)
 	mux.HandleFunc(peers.OperationAddDataService, s.AddDataService)
-	s.h = &http.Server{Addr: p.URL().Host, Handler: mux}
+	s.server = &http.Server{Addr: p.URL().Host, Handler: mux}
 
 	return nil
 }
 
-func (s *placerServer) Run() error                         { return s.h.ListenAndServe() }
-func (s *placerServer) Shutdown(ctx context.Context) error { return s.h.Shutdown(ctx) }
+func (s *placerServer) Run() error                         { return s.server.ListenAndServe() }
+func (s *placerServer) Shutdown(ctx context.Context) error { return s.server.Shutdown(ctx) }
 
 func (s *placerServer) Members(w http.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
