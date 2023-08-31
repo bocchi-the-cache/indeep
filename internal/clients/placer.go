@@ -9,7 +9,7 @@ import (
 )
 
 type PlacerConfig struct {
-	EndpointList api.EndpointMap
+	EndpointMap api.EndpointMap
 
 	httpClient *http.Client
 }
@@ -17,14 +17,14 @@ type PlacerConfig struct {
 type placerClient struct {
 	h *http.Client
 
-	members []api.Endpoint
+	members api.EndpointMap
 	leader  api.Endpoint
 }
 
 func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	cl := &placerClient{
 		h:       c.httpClient,
-		members: c.EndpointList.Endpoints(),
+		members: c.EndpointMap,
 	}
 	leader, err := api.AskLeader(cl)
 	if err != nil {
@@ -34,7 +34,12 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	return cl, nil
 }
 
-func (c *placerClient) Members() []api.Endpoint { return c.members }
+func (c *placerClient) Members() (ret []api.Endpoint) {
+	for _, e := range c.members.Endpoints() {
+		ret = append(ret, e)
+	}
+	return
+}
 
 func (c *placerClient) Leader(e api.Endpoint) (api.Endpoint, error) {
 	resp, err := c.h.Get(e.Operation(endpoints.OperationAskLeader).String())
