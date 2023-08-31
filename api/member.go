@@ -1,19 +1,19 @@
 package api
 
-type Membership interface {
+import "errors"
+
+var (
+	ErrEmptyMembers = errors.New("empty members")
+)
+
+type Member interface {
 	Members() []Endpoint
-	IsLeader(e Endpoint) (bool, error)
+	Leader(e Endpoint) (Endpoint, error)
 }
 
-func GetLeader(m Membership) (Endpoint, error) {
-	for _, e := range m.Members() {
-		isLeader, err := m.IsLeader(e)
-		if err != nil {
-			return nil, err
-		}
-		if isLeader {
-			return e, nil
-		}
+func AskLeader(m Member) (Endpoint, error) {
+	if members := m.Members(); len(members) > 0 {
+		return m.Leader(members[0])
 	}
-	return nil, nil
+	return nil, ErrEmptyMembers
 }

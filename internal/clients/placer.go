@@ -4,11 +4,12 @@ import (
 	"net/http"
 
 	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/endpoints"
 	"github.com/bocchi-the-cache/indeep/internal/jsonutl"
 )
 
 const (
-	httpPathIsLeader = "/get"
+	operationAskLeader = "/leader"
 )
 
 type placerClient struct {
@@ -20,21 +21,18 @@ type placerClient struct {
 
 func (c *placerClient) Members() []api.Endpoint { return c.members }
 
-func (c *placerClient) IsLeader(e api.Endpoint) (bool, error) {
-	// FIXME: Ask one member could know the leader of this cluster, it's unnecessary to ask all.
-	u := e.URL()
-	u.Path = httpPathIsLeader
-	resp, err := c.h.Get(u.String())
+func (c *placerClient) Leader(e api.Endpoint) (api.Endpoint, error) {
+	resp, err := c.h.Get(e.Operation(operationAskLeader).String())
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	var isLeader bool
-	if err := jsonutl.UnmarshalBody(resp.Body, &isLeader); err != nil {
-		return false, err
+	leader := endpoints.EmptyHttpEndpoint()
+	if err := jsonutl.UnmarshalBody(resp.Body, leader); err != nil {
+		return nil, err
 	}
 
-	return isLeader, nil
+	return leader, nil
 }
 
 func (c *placerClient) LookupMetaClient(key api.MetaKey) (api.MetaService, error) {

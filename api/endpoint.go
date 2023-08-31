@@ -8,7 +8,9 @@ import (
 
 type Endpoint interface {
 	fmt.Stringer
+
 	URL() *url.URL
+	Operation(op string) *url.URL
 
 	json.Marshaler
 	json.Unmarshaler
