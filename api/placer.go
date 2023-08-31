@@ -1,7 +1,7 @@
 package api
 
 type Placer interface {
-	Membership
+	Leadership
 
 	LookupMetaClient(key MetaKey) (MetaService, error)
 	AddMetaServer( /* TODO */ ) error

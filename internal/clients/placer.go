@@ -4,21 +4,34 @@ import (
 	"net/http"
 
 	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/jsonutl"
+)
+
+const (
+	httpPathIsLeader = "/get"
 )
 
 type placerClient struct {
 	h *http.Client
 
 	members []api.Endpoint
-	leader  api.Endpoint
 }
 
-func (c *placerClient) Members() []api.Endpoint {
-	//TODO implement me
-	panic("implement me")
-}
+func (c *placerClient) IsLeader(e api.Endpoint) (bool, error) {
+	u := e.URL()
+	u.Path = httpPathIsLeader
+	resp, err := c.h.Get(u.String())
+	if err != nil {
+		return false, err
+	}
 
-func (c *placerClient) Leader() api.Endpoint { return c.leader }
+	var isLeader bool
+	if err := jsonutl.UnmarshalBody(resp.Body, &isLeader); err != nil {
+		return false, err
+	}
+
+	return isLeader, nil
+}
 
 func (c *placerClient) LookupMetaClient(key api.MetaKey) (api.MetaService, error) {
 	//TODO implement me

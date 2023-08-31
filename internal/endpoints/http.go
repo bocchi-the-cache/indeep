@@ -1,20 +1,29 @@
 package endpoints
 
 import (
+	"encoding/json"
 	"net/url"
-
-	"github.com/bocchi-the-cache/indeep/api"
 )
 
 type httpEndpoint struct{ u *url.URL }
 
 func (e *httpEndpoint) String() string { return e.u.String() }
-func (e *httpEndpoint) URL() *url.URL  { return e.u }
+func (e *httpEndpoint) URL() *url.URL {
+	u := *e.u
+	return &u
+}
 
-func NewHttpEndpoint(rawURL string) (api.Endpoint, error) {
+func (e *httpEndpoint) MarshalJSON() ([]byte, error) { return json.Marshal(e.String()) }
+
+func (e *httpEndpoint) UnmarshalJSON(bytes []byte) error {
+	var rawURL string
+	if err := json.Unmarshal(bytes, &rawURL); err != nil {
+		return err
+	}
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &httpEndpoint{u}, nil
+	e.u = u
+	return nil
 }
