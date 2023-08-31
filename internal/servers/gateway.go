@@ -1,7 +1,6 @@
 package servers
 
 import (
-	"context"
 	"flag"
 	"net/http"
 
@@ -28,8 +27,8 @@ type gateway struct {
 	dataCl   api.DataService
 }
 
-func NewGateway(c *GatewayConfig) api.App { return &gateway{config: c} }
-func Gateway() api.App                    { return NewGateway(new(GatewayConfig)) }
+func NewGateway(c *GatewayConfig) api.Server { return &gateway{config: c} }
+func Gateway() api.Server                    { return NewGateway(new(GatewayConfig)) }
 
 func (*gateway) Name() string { return "gateway" }
 
@@ -38,7 +37,7 @@ func (g *gateway) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&g.config.rawPlacerPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
 }
 
-func (g *gateway) Initialize() error {
+func (g *gateway) Setup() error {
 	if g.config.Placer.Peers == nil {
 		ps, err := peers.ParsePeers(g.config.rawPlacerPeers)
 		if err != nil {
@@ -61,5 +60,4 @@ func (g *gateway) Initialize() error {
 	return nil
 }
 
-func (g *gateway) Run() error                         { return g.server.ListenAndServe() }
-func (g *gateway) Shutdown(ctx context.Context) error { return g.server.Shutdown(ctx) }
+func (g *gateway) Server() *http.Server { return g.server }

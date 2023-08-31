@@ -1,7 +1,6 @@
 package servers
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -41,8 +40,8 @@ type placerServer struct {
 	fsm    *placerFSM
 }
 
-func NewPlacer(c *PlacerConfig) api.App { return &placerServer{config: c} }
-func Placer() api.App                   { return NewPlacer(new(PlacerConfig)) }
+func NewPlacer(c *PlacerConfig) api.Server { return &placerServer{config: c} }
+func Placer() api.Server                   { return NewPlacer(new(PlacerConfig)) }
 
 func (*placerServer) Name() string { return "placer" }
 
@@ -51,7 +50,7 @@ func (s *placerServer) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
 }
 
-func (s *placerServer) Initialize() error {
+func (s *placerServer) Setup() error {
 	if s.config.Peers == nil {
 		ps, err := peers.ParsePeers(s.config.rawPeers)
 		if err != nil {
@@ -85,8 +84,7 @@ func (s *placerServer) Initialize() error {
 	return nil
 }
 
-func (s *placerServer) Run() error                         { return s.server.ListenAndServe() }
-func (s *placerServer) Shutdown(ctx context.Context) error { return s.server.Shutdown(ctx) }
+func (s *placerServer) Server() *http.Server { return s.server }
 
 func (s *placerServer) Members(w http.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
