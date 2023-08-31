@@ -15,6 +15,8 @@ const DefaultGatewayHost = "127.0.0.1:11401"
 type GatewayConfig struct {
 	Host   string
 	Placer clients.PlacerConfig
+
+	rawPlacerPeers string
 }
 
 type gateway struct {
@@ -33,15 +35,19 @@ func (*gateway) Name() string { return "gateway" }
 
 func (g *gateway) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&g.c.Host, "host", DefaultGatewayHost, "listen host")
-	f.StringVar(&g.c.Placer.RawPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
+	f.StringVar(&g.c.rawPlacerPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
 }
 
 func (g *gateway) Initialize() error {
-	ps, err := peers.ParsePeers(g.c.Placer.RawPeers)
+	ps, err := peers.ParsePeers(g.c.rawPlacerPeers)
 	if err != nil {
 		return err
 	}
 	g.c.Placer.Peers = ps
+
+	if g.placerCl, err = clients.NewPlacer(&g.c.Placer); err != nil {
+		return err
+	}
 
 	// TODO
 	mux := http.NewServeMux()

@@ -9,8 +9,7 @@ import (
 )
 
 type PlacerConfig struct {
-	Peers    api.Peers
-	RawPeers string
+	Peers api.Peers
 
 	httpClient *http.Client
 }
