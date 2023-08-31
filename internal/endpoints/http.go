@@ -9,6 +9,13 @@ import (
 )
 
 const (
+	OperationGetMembers        = "/get-members"
+	OperationAskLeader         = "/ask-leader"
+	OperationLookupMetaService = "/lookup-meta-service"
+	OperationAddMetaService    = "/add-meta-service"
+	OperationLookupDataService = "/lookup-data-service"
+	OperationAddDataService    = "/add-data-service"
+
 	httpListSep = ","
 	httpScheme  = "http"
 )

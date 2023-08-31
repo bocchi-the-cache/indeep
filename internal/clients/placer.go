@@ -8,10 +8,6 @@ import (
 	"github.com/bocchi-the-cache/indeep/internal/jsonutl"
 )
 
-const (
-	operationAskLeader = "/leader"
-)
-
 type PlacerConfig struct {
 	EndpointList api.EndpointList
 
@@ -41,7 +37,7 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 func (c *placerClient) Members() []api.Endpoint { return c.members }
 
 func (c *placerClient) Leader(e api.Endpoint) (api.Endpoint, error) {
-	resp, err := c.h.Get(e.Operation(operationAskLeader).String())
+	resp, err := c.h.Get(e.Operation(endpoints.OperationAskLeader).String())
 	if err != nil {
 		return nil, err
 	}
@@ -54,22 +50,22 @@ func (c *placerClient) Leader(e api.Endpoint) (api.Endpoint, error) {
 	return leader, nil
 }
 
-func (c *placerClient) LookupMetaClient(key api.MetaKey) (api.MetaService, error) {
+func (c *placerClient) LookupMetaService(key api.MetaKey) (api.MetaService, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *placerClient) AddMetaServer() error {
+func (c *placerClient) AddMetaService() error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *placerClient) LookupDataClient(id api.DataPartitionID) (api.DataService, error) {
+func (c *placerClient) LookupDataService(id api.DataPartitionID) (api.DataService, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *placerClient) AddDataServer() error {
+func (c *placerClient) AddDataService() error {
 	//TODO implement me
 	panic("implement me")
 }
