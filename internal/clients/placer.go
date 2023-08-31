@@ -15,9 +15,13 @@ type placerClient struct {
 	h *http.Client
 
 	members []api.Endpoint
+	leader  api.Endpoint
 }
 
+func (c *placerClient) Members() []api.Endpoint { return c.members }
+
 func (c *placerClient) IsLeader(e api.Endpoint) (bool, error) {
+	// FIXME: Ask one member could know the leader of this cluster, it's unnecessary to ask all.
 	u := e.URL()
 	u.Path = httpPathIsLeader
 	resp, err := c.h.Get(u.String())
