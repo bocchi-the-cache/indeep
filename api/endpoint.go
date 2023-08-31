@@ -6,6 +6,13 @@ import (
 	"net/url"
 )
 
+type EndpointList interface {
+	Endpoints() []Endpoint
+
+	json.Marshaler
+	json.Unmarshaler
+}
+
 type Endpoint interface {
 	fmt.Stringer
 

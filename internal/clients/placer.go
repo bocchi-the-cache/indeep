@@ -12,11 +12,30 @@ const (
 	operationAskLeader = "/leader"
 )
 
+type PlacerConfig struct {
+	EndpointList api.EndpointList
+
+	httpClient *http.Client
+}
+
 type placerClient struct {
 	h *http.Client
 
 	members []api.Endpoint
 	leader  api.Endpoint
+}
+
+func NewPlacer(c *PlacerConfig) (api.Placer, error) {
+	cl := &placerClient{
+		h:       c.httpClient,
+		members: c.EndpointList.Endpoints(),
+	}
+	leader, err := api.AskLeader(cl)
+	if err != nil {
+		return nil, err
+	}
+	cl.leader = leader
+	return cl, nil
 }
 
 func (c *placerClient) Members() []api.Endpoint { return c.members }
@@ -27,7 +46,7 @@ func (c *placerClient) Leader(e api.Endpoint) (api.Endpoint, error) {
 		return nil, err
 	}
 
-	leader := endpoints.EmptyHttpEndpoint()
+	leader := endpoints.DefaultEndpoint()
 	if err := jsonutl.UnmarshalBody(resp.Body, leader); err != nil {
 		return nil, err
 	}
