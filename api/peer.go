@@ -6,15 +6,18 @@ import (
 	"net/url"
 )
 
-type EndpointMap interface {
-	Endpoints() map[string]Endpoint
+type PeerID string
+
+type Peers interface {
+	IDs() []PeerID
+	Peers() []Peer
+	Lookup(id PeerID) Peer
 
 	json.Marshaler
 	json.Unmarshaler
 }
 
-type Endpoint interface {
-	ID() string
+type Peer interface {
 	fmt.Stringer
 
 	URL() *url.URL

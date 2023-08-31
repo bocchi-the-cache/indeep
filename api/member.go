@@ -7,13 +7,13 @@ var (
 )
 
 type Member interface {
-	Members() []Endpoint
-	Leader(e Endpoint) (Endpoint, error)
+	Members() Peers
+	Leader(e Peer) (Peer, error)
 }
 
-func AskLeader(m Member) (Endpoint, error) {
-	if members := m.Members(); len(members) > 0 {
-		return m.Leader(members[0])
+func AskLeader(m Member) (Peer, error) {
+	for _, e := range m.Members().Peers() {
+		return m.Leader(e)
 	}
 	return nil, ErrEmptyMembers
 }

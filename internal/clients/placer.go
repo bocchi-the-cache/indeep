@@ -4,12 +4,12 @@ import (
 	"net/http"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/endpoints"
 	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
+	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
 type PlacerConfig struct {
-	EndpointMap api.EndpointMap
+	Peers api.Peers
 
 	httpClient *http.Client
 }
@@ -17,14 +17,14 @@ type PlacerConfig struct {
 type placerClient struct {
 	h *http.Client
 
-	members api.EndpointMap
-	leader  api.Endpoint
+	members api.Peers
+	leader  api.Peer
 }
 
 func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	cl := &placerClient{
 		h:       c.httpClient,
-		members: c.EndpointMap,
+		members: c.Peers,
 	}
 	leader, err := api.AskLeader(cl)
 	if err != nil {
@@ -34,20 +34,15 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	return cl, nil
 }
 
-func (c *placerClient) Members() (ret []api.Endpoint) {
-	for _, e := range c.members.Endpoints() {
-		ret = append(ret, e)
-	}
-	return
-}
+func (c *placerClient) Members() api.Peers { return c.members }
 
-func (c *placerClient) Leader(e api.Endpoint) (api.Endpoint, error) {
-	resp, err := c.h.Get(e.Operation(endpoints.OperationAskLeader).String())
+func (c *placerClient) Leader(e api.Peer) (api.Peer, error) {
+	resp, err := c.h.Get(e.Operation(peers.OperationAskLeader).String())
 	if err != nil {
 		return nil, err
 	}
 
-	leader := endpoints.DefaultEndpoint()
+	leader := peers.DefaultPeer()
 	if err := jsonhttp.Unmarshal(resp.Body, leader); err != nil {
 		return nil, err
 	}

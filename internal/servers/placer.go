@@ -7,15 +7,15 @@ import (
 	"net/http"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/endpoints"
 	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
+	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
 var ErrPlacerUnknownID = errors.New("unknown place ID")
 
 type PlacerConfig struct {
-	ID    string
-	Peers api.EndpointMap
+	ID    api.PeerID
+	Peers api.Peers
 }
 
 type PlacerServer struct {
@@ -25,33 +25,32 @@ type PlacerServer struct {
 }
 
 func NewPlacerServer(c *PlacerConfig) (*PlacerServer, error) {
-	m := c.Peers.Endpoints()
-	e, ok := m[c.ID]
-	if !ok {
+	p := c.Peers.Lookup(c.ID)
+	if p == nil {
 		return nil, fmt.Errorf("%w: id=%s", ErrPlacerUnknownID, c.ID)
 	}
 
-	p := &PlacerServer{
+	s := &PlacerServer{
 		c: c,
-		h: &http.Server{Addr: e.URL().Host},
+		h: &http.Server{Addr: p.URL().Host},
 		fsm: &placerFSM{
 			peers:    c.Peers,
-			self:     e,
-			leader:   e,
+			self:     p,
+			leader:   p,
 			isLeader: true,
 		},
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(endpoints.OperationGetMembers, p.Members)
-	mux.HandleFunc(endpoints.OperationAskLeader, p.Leader)
-	mux.HandleFunc(endpoints.OperationLookupMetaService, p.LookupMetaService)
-	mux.HandleFunc(endpoints.OperationAddMetaService, p.AddMetaService)
-	mux.HandleFunc(endpoints.OperationLookupDataService, p.LookupDataService)
-	mux.HandleFunc(endpoints.OperationAddDataService, p.AddDataService)
-	p.h.Handler = mux
+	mux.HandleFunc(peers.OperationGetMembers, s.Members)
+	mux.HandleFunc(peers.OperationAskLeader, s.Leader)
+	mux.HandleFunc(peers.OperationLookupMetaService, s.LookupMetaService)
+	mux.HandleFunc(peers.OperationAddMetaService, s.AddMetaService)
+	mux.HandleFunc(peers.OperationLookupDataService, s.LookupDataService)
+	mux.HandleFunc(peers.OperationAddDataService, s.AddDataService)
+	s.h.Handler = mux
 
-	return p, nil
+	return s, nil
 }
 
 func (p *PlacerServer) Run() error { return p.h.ListenAndServe() }
@@ -96,18 +95,18 @@ func (p *PlacerServer) AddDataService(w http.ResponseWriter, r *http.Request) {
 
 type placerFSM struct {
 	// FIXME: Any locks here?
-	peers    api.EndpointMap
-	self     api.Endpoint
-	leader   api.Endpoint
+	peers    api.Peers
+	self     api.Peer
+	leader   api.Peer
 	isLeader bool
 }
 
-func (p *placerFSM) Members() []api.Endpoint {
+func (p *placerFSM) Members() []api.Peer {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (p *placerFSM) Leader(e api.Endpoint) (api.Endpoint, error) {
+func (p *placerFSM) Leader(e api.Peer) (api.Peer, error) {
 	//TODO implement me
 	panic("implement me")
 }

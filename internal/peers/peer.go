@@ -1,4 +1,4 @@
-package endpoints
+package peers
 
 import (
 	"encoding/json"
@@ -25,23 +25,37 @@ const (
 
 var (
 	ErrEmptyHosts    = errors.New("empty hosts")
-	ErrEmptyIDs      = errors.New("empty endpoint IDs")
+	ErrEmptyIDs      = errors.New("empty peer IDs")
 	ErrMapMismatched = errors.New("map mismatched")
 )
 
-type endpointMap struct{ m map[string]api.Endpoint }
+type peers struct{ m map[api.PeerID]api.Peer }
 
-func DefaultEndpointMap() api.EndpointMap { return new(endpointMap) }
+func DefaultPeers() api.Peers { return new(peers) }
 
-func (h *endpointMap) Endpoints() map[string]api.Endpoint { return h.m }
+func (p *peers) IDs() (ret []api.PeerID) {
+	for id := range p.m {
+		ret = append(ret, id)
+	}
+	return
+}
 
-func (h *endpointMap) MarshalJSON() ([]byte, error) {
+func (p *peers) Peers() (ret []api.Peer) {
+	for _, peer := range p.m {
+		ret = append(ret, peer)
+	}
+	return
+}
+
+func (p *peers) Lookup(id api.PeerID) api.Peer { return p.m[id] }
+
+func (p *peers) MarshalJSON() ([]byte, error) {
 	var (
 		ids   []string
 		hosts []string
 	)
-	for id, e := range h.m {
-		ids = append(ids, id)
+	for id, e := range p.m {
+		ids = append(ids, string(id))
 		hosts = append(hosts, e.URL().Host)
 	}
 	u := &url.URL{
@@ -52,7 +66,7 @@ func (h *endpointMap) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.String())
 }
 
-func (h *endpointMap) UnmarshalJSON(bytes []byte) error {
+func (p *peers) UnmarshalJSON(bytes []byte) error {
 	var rawURL string
 	if err := json.Unmarshal(bytes, &rawURL); err != nil {
 		return err
@@ -78,36 +92,32 @@ func (h *endpointMap) UnmarshalJSON(bytes []byte) error {
 		return fmt.Errorf("%w: hosts=%v, ids=%v", ErrMapMismatched, hosts, ids)
 	}
 
-	m := make(map[string]api.Endpoint)
+	m := make(map[api.PeerID]api.Peer)
 	for i, host := range hosts {
-		id := ids[i]
-		m[id] = NewEndpoint(id, &url.URL{Scheme: defaultScheme, Host: host})
+		id := api.PeerID(ids[i])
+		m[id] = NewPeer(host)
 	}
-	h.m = m
+	p.m = m
 
 	return nil
 }
 
-type endpoint struct {
-	id string
-	u  *url.URL
-}
+type peer struct{ u *url.URL }
 
-func DefaultEndpoint() api.Endpoint                  { return new(endpoint) }
-func NewEndpoint(id string, u *url.URL) api.Endpoint { return &endpoint{id, u} }
+func DefaultPeer() api.Peer        { return new(peer) }
+func NewPeer(host string) api.Peer { return &peer{u: &url.URL{Scheme: defaultScheme, Host: host}} }
 
-func (e *endpoint) ID() string     { return e.id }
-func (e *endpoint) String() string { return e.u.String() }
+func (p *peer) String() string { return p.u.String() }
 
-func (e *endpoint) URL() *url.URL { return &url.URL{Scheme: e.u.Scheme, Host: e.u.Host} }
-func (e *endpoint) Operation(op string) *url.URL {
-	u := e.URL()
+func (p *peer) URL() *url.URL { return &url.URL{Scheme: p.u.Scheme, Host: p.u.Host} }
+func (p *peer) Operation(op string) *url.URL {
+	u := p.URL()
 	u.Path = op
 	return u
 }
 
-func (e *endpoint) MarshalJSON() ([]byte, error) { return json.Marshal(e.String()) }
-func (e *endpoint) UnmarshalJSON(bytes []byte) error {
+func (p *peer) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
+func (p *peer) UnmarshalJSON(bytes []byte) error {
 	var rawURL string
 	if err := json.Unmarshal(bytes, &rawURL); err != nil {
 		return err
@@ -116,6 +126,6 @@ func (e *endpoint) UnmarshalJSON(bytes []byte) error {
 	if err != nil {
 		return err
 	}
-	e.u = u
+	p.u = u
 	return nil
 }
