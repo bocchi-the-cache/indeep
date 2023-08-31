@@ -6,7 +6,8 @@ import (
 )
 
 type App interface {
-	FlagSet() *flag.FlagSet
+	Name() string
+	DefineFlags(f *flag.FlagSet)
 	Initialize() error
 	Run() error
 	Shutdown(ctx context.Context) error

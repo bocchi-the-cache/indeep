@@ -3,6 +3,7 @@ package apps
 import (
 	"context"
 	"errors"
+	"flag"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,6 +12,8 @@ import (
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 )
+
+func MainServer(a api.App) { RunServer(a, os.Args[1:]) }
 
 func RunServer(a api.App, args []string) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -32,7 +35,8 @@ func RunServer(a api.App, args []string) {
 }
 
 func Run(a api.App, args []string) error {
-	f := a.FlagSet()
+	f := flag.NewFlagSet(a.Name(), flag.ContinueOnError)
+	a.DefineFlags(f)
 	if err := f.Parse(args); err != nil {
 		return err
 	}

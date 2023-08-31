@@ -15,7 +15,7 @@ import (
 
 const (
 	DefaultPlacerID   = "placer0"
-	DefaultPlacerHost = "127.0.0.1:11401"
+	DefaultPlacerHost = "127.0.0.1:11402"
 )
 
 var (
@@ -42,13 +42,13 @@ type placerServer struct {
 }
 
 func NewPlacer(c *PlacerConfig) api.App { return &placerServer{c: c} }
-func DefaultPlacer() api.App            { return NewPlacer(new(PlacerConfig)) }
+func Placer() api.App                   { return NewPlacer(new(PlacerConfig)) }
 
-func (s *placerServer) FlagSet() *flag.FlagSet {
-	f := flag.NewFlagSet("placer", flag.ContinueOnError)
+func (*placerServer) Name() string { return "placer" }
+
+func (s *placerServer) DefineFlags(f *flag.FlagSet) {
 	f.StringVar((*string)(&s.c.ID), "id", DefaultPlacerID, "placer ID")
 	f.StringVar(&s.c.rawPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
-	return f
 }
 
 func (s *placerServer) Initialize() error {
@@ -83,8 +83,7 @@ func (s *placerServer) Initialize() error {
 	return nil
 }
 
-func (s *placerServer) Run() error { return s.h.ListenAndServe() }
-
+func (s *placerServer) Run() error                         { return s.h.ListenAndServe() }
 func (s *placerServer) Shutdown(ctx context.Context) error { return s.h.Shutdown(ctx) }
 
 func (s *placerServer) Members(w http.ResponseWriter, r *http.Request) {
