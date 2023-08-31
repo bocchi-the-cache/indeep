@@ -3,42 +3,72 @@ package servers
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
-var ErrPlacerUnknownID = errors.New("unknown place ID")
+const (
+	DefaultPlacerID   = "placer0"
+	DefaultPlacerHost = "127.0.0.1:11401"
+)
+
+var (
+	ErrPlacerUnknownID = errors.New("unknown placer ID")
+
+	DefaultPlacerRawPeers = (&url.URL{
+		Scheme: peers.DefaultScheme,
+		Host:   DefaultPlacerHost,
+		Path:   peers.IDsPrefix + DefaultPlacerID,
+	}).String()
+)
 
 type PlacerConfig struct {
 	ID    api.PeerID
 	Peers api.Peers
+
+	rawPeers string
 }
 
-type PlacerServer struct {
+type placerServer struct {
 	c   *PlacerConfig
 	h   *http.Server
 	fsm *placerFSM
 }
 
-func NewPlacerServer(c *PlacerConfig) (*PlacerServer, error) {
-	p := c.Peers.Lookup(c.ID)
+func NewPlacer(c *PlacerConfig) api.App { return &placerServer{c: c} }
+func DefaultPlacer() api.App            { return NewPlacer(new(PlacerConfig)) }
+
+func (s *placerServer) FlagSet() *flag.FlagSet {
+	f := flag.NewFlagSet("placer", flag.ContinueOnError)
+	f.StringVar((*string)(&s.c.ID), "id", DefaultPlacerID, "placer ID")
+	f.StringVar(&s.c.rawPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
+	return f
+}
+
+func (s *placerServer) Initialize() error {
+	ps, err := peers.ParsePeers(s.c.rawPeers)
+	if err != nil {
+		return err
+	}
+	s.c.Peers = ps
+
+	p := ps.Lookup(s.c.ID)
 	if p == nil {
-		return nil, fmt.Errorf("%w: id=%s", ErrPlacerUnknownID, c.ID)
+		return fmt.Errorf("%w: id=%s", ErrPlacerUnknownID, s.c.ID)
 	}
 
-	s := &PlacerServer{
-		c: c,
-		h: &http.Server{Addr: p.URL().Host},
-		fsm: &placerFSM{
-			peers:    c.Peers,
-			self:     p,
-			leader:   p,
-			isLeader: true,
-		},
+	// TODO
+	s.fsm = &placerFSM{
+		peers:    ps,
+		self:     p,
+		leader:   p,
+		isLeader: true,
 	}
 
 	mux := http.NewServeMux()
@@ -48,24 +78,24 @@ func NewPlacerServer(c *PlacerConfig) (*PlacerServer, error) {
 	mux.HandleFunc(peers.OperationAddMetaService, s.AddMetaService)
 	mux.HandleFunc(peers.OperationLookupDataService, s.LookupDataService)
 	mux.HandleFunc(peers.OperationAddDataService, s.AddDataService)
-	s.h.Handler = mux
+	s.h = &http.Server{Addr: p.URL().Host, Handler: mux}
 
-	return s, nil
+	return nil
 }
 
-func (p *PlacerServer) Run() error { return p.h.ListenAndServe() }
+func (s *placerServer) Run() error { return s.h.ListenAndServe() }
 
-func (p *PlacerServer) Shutdown(ctx context.Context) error { return p.h.Shutdown(ctx) }
+func (s *placerServer) Shutdown(ctx context.Context) error { return s.h.Shutdown(ctx) }
 
-func (p *PlacerServer) Members(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) Members(w http.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
-	jsonhttp.W(w).OK(p.fsm.Members())
+	jsonhttp.W(w).OK(s.fsm.Members())
 }
 
-func (p *PlacerServer) Leader(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) Leader(w http.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
 	jw := jsonhttp.W(w)
-	l, err := p.fsm.Leader(nil)
+	l, err := s.fsm.Leader(nil)
 	if err != nil {
 		jw.Err(err)
 		return
@@ -73,24 +103,24 @@ func (p *PlacerServer) Leader(w http.ResponseWriter, r *http.Request) {
 	jw.OK(l)
 }
 
-func (p *PlacerServer) LookupMetaService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) LookupMetaService(w http.ResponseWriter, r *http.Request) {
 	// TODO
-	_, _ = p.fsm.LookupMetaService(nil)
+	_, _ = s.fsm.LookupMetaService(nil)
 }
 
-func (p *PlacerServer) AddMetaService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) AddMetaService(w http.ResponseWriter, r *http.Request) {
 	// TODO
-	_ = p.fsm.AddMetaService()
+	_ = s.fsm.AddMetaService()
 }
 
-func (p *PlacerServer) LookupDataService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) LookupDataService(w http.ResponseWriter, r *http.Request) {
 	// TODO
-	_, _ = p.fsm.LookupDataService(nil)
+	_, _ = s.fsm.LookupDataService(nil)
 }
 
-func (p *PlacerServer) AddDataService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) AddDataService(w http.ResponseWriter, r *http.Request) {
 	// TODO
-	_ = p.fsm.AddDataService()
+	_ = s.fsm.AddDataService()
 }
 
 type placerFSM struct {
@@ -101,14 +131,12 @@ type placerFSM struct {
 	isLeader bool
 }
 
-func (p *placerFSM) Members() []api.Peer {
-	//TODO implement me
-	panic("implement me")
+func (p *placerFSM) Members() api.Peers {
+	return p.peers
 }
 
-func (p *placerFSM) Leader(e api.Peer) (api.Peer, error) {
-	//TODO implement me
-	panic("implement me")
+func (p *placerFSM) Leader(api.Peer) (api.Peer, error) {
+	return p.leader, nil
 }
 
 func (p *placerFSM) LookupMetaService(key api.MetaKey) (api.MetaService, error) {

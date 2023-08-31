@@ -9,9 +9,14 @@ import (
 type PeerID string
 
 type Peers interface {
+	fmt.Stringer
+
 	IDs() []PeerID
 	Peers() []Peer
+
 	Lookup(id PeerID) Peer
+	Join(id PeerID, peer Peer) Peers
+	Quit(id PeerID)
 
 	json.Marshaler
 	json.Unmarshaler

@@ -18,9 +18,9 @@ const (
 	OperationLookupDataService = "/lookup-data-service"
 	OperationAddDataService    = "/add-data-service"
 
+	DefaultScheme = "http"
+	IDsPrefix     = "/"
 	mapSep        = ","
-	pathPrefix    = "/"
-	defaultScheme = "http"
 )
 
 var (
@@ -31,7 +31,62 @@ var (
 
 type peers struct{ m map[api.PeerID]api.Peer }
 
+func (p *peers) String() string {
+	var (
+		ids   []string
+		hosts []string
+	)
+	for id, e := range p.m {
+		ids = append(ids, string(id))
+		hosts = append(hosts, e.URL().Host)
+	}
+	u := &url.URL{
+		Scheme: DefaultScheme,
+		Host:   strings.Join(hosts, mapSep),
+		Path:   IDsPrefix + strings.Join(ids, mapSep),
+	}
+	return u.String()
+}
+
 func DefaultPeers() api.Peers { return new(peers) }
+
+func ParsePeers(rawURL string) (api.Peers, error) {
+	m, err := parsePeers(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	return &peers{m}, nil
+}
+
+func parsePeers(rawURL string) (map[api.PeerID]api.Peer, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Host == "" {
+		return nil, ErrEmptyHosts
+	}
+	hosts := strings.Split(u.Host, mapSep)
+
+	rawPath := strings.TrimLeft(u.Path, IDsPrefix)
+	if rawPath == "" {
+		return nil, ErrEmptyIDs
+	}
+	ids := strings.Split(rawPath, mapSep)
+
+	if len(hosts) != len(ids) {
+		return nil, fmt.Errorf("%w: hosts=%v, ids=%v", ErrMapMismatched, hosts, ids)
+	}
+
+	m := make(map[api.PeerID]api.Peer)
+	for i, host := range hosts {
+		id := api.PeerID(ids[i])
+		m[id] = &peer{u: &url.URL{Scheme: DefaultScheme, Host: host}}
+	}
+
+	return m, nil
+}
 
 func (p *peers) IDs() (ret []api.PeerID) {
 	for id := range p.m {
@@ -49,22 +104,16 @@ func (p *peers) Peers() (ret []api.Peer) {
 
 func (p *peers) Lookup(id api.PeerID) api.Peer { return p.m[id] }
 
-func (p *peers) MarshalJSON() ([]byte, error) {
-	var (
-		ids   []string
-		hosts []string
-	)
-	for id, e := range p.m {
-		ids = append(ids, string(id))
-		hosts = append(hosts, e.URL().Host)
+func (p *peers) Join(id api.PeerID, peer api.Peer) api.Peers {
+	if _, ok := p.m[id]; !ok {
+		p.m[id] = peer
 	}
-	u := &url.URL{
-		Scheme: defaultScheme,
-		Host:   strings.Join(hosts, mapSep),
-		Path:   pathPrefix + strings.Join(ids, mapSep),
-	}
-	return json.Marshal(u.String())
+	return p
 }
+
+func (p *peers) Quit(id api.PeerID) { delete(p.m, id) }
+
+func (p *peers) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
 
 func (p *peers) UnmarshalJSON(bytes []byte) error {
 	var rawURL string
@@ -82,7 +131,7 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 	}
 	hosts := strings.Split(u.Host, mapSep)
 
-	rawPath := strings.TrimLeft(u.Path, pathPrefix)
+	rawPath := strings.TrimLeft(u.Path, IDsPrefix)
 	if rawPath == "" {
 		return ErrEmptyIDs
 	}
@@ -95,7 +144,7 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 	m := make(map[api.PeerID]api.Peer)
 	for i, host := range hosts {
 		id := api.PeerID(ids[i])
-		m[id] = NewPeer(host)
+		m[id] = &peer{u: &url.URL{Scheme: DefaultScheme, Host: host}}
 	}
 	p.m = m
 
@@ -104,12 +153,22 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 
 type peer struct{ u *url.URL }
 
-func DefaultPeer() api.Peer        { return new(peer) }
-func NewPeer(host string) api.Peer { return &peer{u: &url.URL{Scheme: defaultScheme, Host: host}} }
+func DefaultPeer() api.Peer { return new(peer) }
+
+func ParsePeer(rawURL string) (api.Peer, error) {
+	p, err := parsePeer(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	return &peer{p}, nil
+}
+
+var parsePeer = url.Parse
 
 func (p *peer) String() string { return p.u.String() }
 
 func (p *peer) URL() *url.URL { return &url.URL{Scheme: p.u.Scheme, Host: p.u.Host} }
+
 func (p *peer) Operation(op string) *url.URL {
 	u := p.URL()
 	u.Path = op
@@ -117,12 +176,13 @@ func (p *peer) Operation(op string) *url.URL {
 }
 
 func (p *peer) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
+
 func (p *peer) UnmarshalJSON(bytes []byte) error {
 	var rawURL string
 	if err := json.Unmarshal(bytes, &rawURL); err != nil {
 		return err
 	}
-	u, err := url.Parse(rawURL)
+	u, err := parsePeer(rawURL)
 	if err != nil {
 		return err
 	}
