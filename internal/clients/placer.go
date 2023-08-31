@@ -5,11 +5,11 @@ import (
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/endpoints"
-	"github.com/bocchi-the-cache/indeep/internal/jsonutl"
+	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
 )
 
 type PlacerConfig struct {
-	EndpointList api.EndpointList
+	EndpointList api.EndpointMap
 
 	httpClient *http.Client
 }
@@ -43,7 +43,7 @@ func (c *placerClient) Leader(e api.Endpoint) (api.Endpoint, error) {
 	}
 
 	leader := endpoints.DefaultEndpoint()
-	if err := jsonutl.UnmarshalBody(resp.Body, leader); err != nil {
+	if err := jsonhttp.Unmarshal(resp.Body, leader); err != nil {
 		return nil, err
 	}
 

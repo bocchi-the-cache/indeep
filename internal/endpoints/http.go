@@ -2,6 +2,8 @@ package endpoints
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -16,45 +18,85 @@ const (
 	OperationLookupDataService = "/lookup-data-service"
 	OperationAddDataService    = "/add-data-service"
 
-	httpListSep = ","
-	httpScheme  = "http"
+	mapSep        = ","
+	pathPrefix    = "/"
+	defaultScheme = "http"
 )
 
-type endpointList struct{ es []api.Endpoint }
+var (
+	ErrEmptyHosts    = errors.New("empty hosts")
+	ErrEmptyIDs      = errors.New("empty endpoint IDs")
+	ErrMapMismatched = errors.New("map mismatched")
+)
 
-func DefaultEndpointList() api.EndpointList { return new(endpointList) }
+type endpointMap struct{ m map[string]api.Endpoint }
 
-func (h *endpointList) Endpoints() []api.Endpoint { return h.es }
+func DefaultEndpointMap() api.EndpointMap { return new(endpointMap) }
 
-func (h *endpointList) MarshalJSON() ([]byte, error) {
-	var hosts []string
-	for _, e := range h.es {
+func (h *endpointMap) Endpoints() map[string]api.Endpoint { return h.m }
+
+func (h *endpointMap) MarshalJSON() ([]byte, error) {
+	var (
+		ids   []string
+		hosts []string
+	)
+	for id, e := range h.m {
+		ids = append(ids, id)
 		hosts = append(hosts, e.URL().Host)
 	}
-	u := &url.URL{Scheme: httpScheme, Host: strings.Join(hosts, httpListSep)}
+	u := &url.URL{
+		Scheme: defaultScheme,
+		Host:   strings.Join(hosts, mapSep),
+		Path:   pathPrefix + strings.Join(ids, mapSep),
+	}
 	return json.Marshal(u.String())
 }
 
-func (h *endpointList) UnmarshalJSON(bytes []byte) error {
+func (h *endpointMap) UnmarshalJSON(bytes []byte) error {
 	var rawURL string
 	if err := json.Unmarshal(bytes, &rawURL); err != nil {
 		return err
 	}
+
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return err
 	}
-	for _, host := range strings.Split(u.Host, ",") {
-		h.es = append(h.es, NewEndpoint(&url.URL{Scheme: httpScheme, Host: host}))
+
+	if u.Host == "" {
+		return ErrEmptyHosts
 	}
+	hosts := strings.Split(u.Host, mapSep)
+
+	rawPath := strings.TrimLeft(u.Path, pathPrefix)
+	if rawPath == "" {
+		return ErrEmptyIDs
+	}
+	ids := strings.Split(rawPath, mapSep)
+
+	if len(hosts) != len(ids) {
+		return fmt.Errorf("%w: hosts=%v, ids=%v", ErrMapMismatched, hosts, ids)
+	}
+
+	m := make(map[string]api.Endpoint)
+	for i, host := range hosts {
+		id := ids[i]
+		m[id] = NewEndpoint(id, &url.URL{Scheme: defaultScheme, Host: host})
+	}
+	h.m = m
+
 	return nil
 }
 
-type endpoint struct{ u *url.URL }
+type endpoint struct {
+	id string
+	u  *url.URL
+}
 
-func DefaultEndpoint() api.Endpoint       { return new(endpoint) }
-func NewEndpoint(u *url.URL) api.Endpoint { return &endpoint{u} }
+func DefaultEndpoint() api.Endpoint                  { return new(endpoint) }
+func NewEndpoint(id string, u *url.URL) api.Endpoint { return &endpoint{id, u} }
 
+func (e *endpoint) ID() string     { return e.id }
 func (e *endpoint) String() string { return e.u.String() }
 
 func (e *endpoint) URL() *url.URL { return &url.URL{Scheme: e.u.Scheme, Host: e.u.Host} }
