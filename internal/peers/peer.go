@@ -13,9 +13,8 @@ import (
 )
 
 const (
-	IDsPrefix = "/"
-	OpPrefix
-	mapSep = ","
+	RootPath = "/"
+	mapSep   = ","
 )
 
 var (
@@ -28,23 +27,6 @@ var (
 type peers struct {
 	scheme string
 	m      map[raft.ServerID]api.Peer
-}
-
-func (p *peers) String() string {
-	var (
-		ids   []string
-		hosts []string
-	)
-	for id, e := range p.m {
-		ids = append(ids, string(id))
-		hosts = append(hosts, e.URL().Host)
-	}
-	u := &url.URL{
-		Scheme: p.scheme,
-		Host:   strings.Join(hosts, mapSep),
-		Path:   IDsPrefix + strings.Join(ids, mapSep),
-	}
-	return u.String()
 }
 
 func ParsePeerURLs(rawURLs ...[2]string) (api.Peers, error) {
@@ -84,7 +66,7 @@ func parsePeers(rawURL string) (string, map[raft.ServerID]api.Peer, error) {
 	}
 	hosts := strings.Split(u.Host, mapSep)
 
-	rawPath := strings.TrimLeft(u.Path, IDsPrefix)
+	rawPath := strings.TrimLeft(u.Path, RootPath)
 	if rawPath == "" {
 		return "", nil, ErrEmptyIDs
 	}
@@ -101,6 +83,23 @@ func parsePeers(rawURL string) (string, map[raft.ServerID]api.Peer, error) {
 	}
 
 	return u.Scheme, m, nil
+}
+
+func (p *peers) String() string {
+	var (
+		ids   []string
+		hosts []string
+	)
+	for id, e := range p.m {
+		ids = append(ids, string(id))
+		hosts = append(hosts, e.URL().Host)
+	}
+	u := &url.URL{
+		Scheme: p.scheme,
+		Host:   strings.Join(hosts, mapSep),
+		Path:   RootPath + strings.Join(ids, mapSep),
+	}
+	return u.String()
 }
 
 func (p *peers) IDs() (ret []raft.ServerID) {
@@ -157,7 +156,7 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 	}
 	hosts := strings.Split(u.Host, mapSep)
 
-	rawPath := strings.TrimLeft(u.Path, IDsPrefix)
+	rawPath := strings.TrimLeft(u.Path, RootPath)
 	if rawPath == "" {
 		return ErrEmptyIDs
 	}
@@ -192,12 +191,16 @@ func ParsePeer(rawURL string) (api.Peer, error) {
 	return &peer{u: u}, nil
 }
 
+func TCPVoter(addr raft.ServerAddress) api.Peer {
+	return &peer{u: &url.URL{Scheme: "tcp", Host: string(addr)}}
+}
+
 var parsePeer = url.Parse
 
 func (p *peer) String() string { return p.u.String() }
 func (p *peer) URL() *url.URL  { return p.u }
 func (p *peer) RPC(id api.RpcID) *url.URL {
-	return &url.URL{Scheme: p.u.Scheme, Host: p.u.Host, Path: OpPrefix + string(id)}
+	return &url.URL{Scheme: p.u.Scheme, Host: p.u.Host, Path: RootPath + string(id)}
 }
 
 func (p *peer) Suffrage() raft.ServerSuffrage { return p.s }

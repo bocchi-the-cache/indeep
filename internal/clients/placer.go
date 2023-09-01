@@ -3,6 +3,8 @@ package clients
 import (
 	"net/http"
 
+	"github.com/hashicorp/raft"
+
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
@@ -17,8 +19,9 @@ type PlacerConfig struct {
 type placerClient struct {
 	h *http.Client
 
-	members api.Peers
-	leader  api.Peer
+	members  api.Peers
+	leaderID raft.ServerID
+	leader   api.Peer
 }
 
 func NewPlacer(c *PlacerConfig) (api.Placer, error) {
@@ -26,28 +29,29 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 		h:       c.httpClient,
 		members: c.Peers,
 	}
-	leader, err := api.AskLeader(cl)
+	info, err := api.AskLeader(cl)
 	if err != nil {
 		return nil, err
 	}
-	cl.leader = leader
+	cl.leaderID = info.ID
+	cl.leader = info.Peer
 	return cl, nil
 }
 
-func (c *placerClient) Members() api.Peers { return c.members }
+func (c *placerClient) GetMembers() api.Peers { return c.members }
 
-func (c *placerClient) Leader(e api.Peer) (api.Peer, error) {
+func (c *placerClient) AskLeader(e api.Peer) (*api.PeerInfo, error) {
 	resp, err := c.h.Get(e.RPC(api.RpcAskLeader).String())
 	if err != nil {
 		return nil, err
 	}
 
-	leader := peers.DefaultPeer()
-	if err := jsonhttp.Unmarshal(resp.Body, leader); err != nil {
+	info := &api.PeerInfo{Peer: peers.DefaultPeer()}
+	if err := jsonhttp.Unmarshal(resp.Body, info); err != nil {
 		return nil, err
 	}
 
-	return leader, nil
+	return info, nil
 }
 
 func (c *placerClient) LookupMetaService(key api.MetaKey) (api.MetaService, error) {

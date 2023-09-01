@@ -24,7 +24,7 @@ const (
 	DefaultPlacerHost     = "127.0.0.1:11451"
 	DefaultPlacerID       = "placer0"
 	DefaultPlacerURL      = "tcp://127.0.0.1:11551"
-	DefaultPlacerPeersURL = DefaultPlacerURL + peers.IDsPrefix + DefaultPlacerID
+	DefaultPlacerPeersURL = DefaultPlacerURL + peers.RootPath + DefaultPlacerID
 	DefaultSnapshotDir    = "."
 	DefaultSnapshotRetain = 10
 	DefaultLogDBFile      = "placer.log.bolt"
@@ -79,7 +79,6 @@ func (c *PlacerConfig) hcLogger(name string) hclog.Logger {
 type placerServer struct {
 	config *PlacerConfig
 	server *http.Server
-	fsm    *placerFSM
 	rn     *raft.Raft
 }
 
@@ -138,14 +137,6 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	// TODO
-	s.fsm = &placerFSM{
-		peers:    s.config.Peers,
-		self:     p,
-		leader:   p,
-		isLeader: true,
-	}
-
 	logDB, err := raftboltdb.New(raftboltdb.Options{Path: s.config.LogDBPath})
 	if err != nil {
 		return err
@@ -160,7 +151,7 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	rn, err := raft.NewRaft(config, s.fsm, cachedLogDB, stableDB, snaps, trans)
+	rn, err := raft.NewRaft(config, s, cachedLogDB, stableDB, snaps, trans)
 	if err != nil {
 		return err
 	}
@@ -168,12 +159,12 @@ func (s *placerServer) Setup() error {
 	s.rn.BootstrapCluster(s.config.Peers.Configuration())
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(p.RPC(api.RpcGetMembers).Path, s.Members)
-	mux.HandleFunc(p.RPC(api.RpcAskLeader).Path, s.Leader)
-	mux.HandleFunc(p.RPC(api.RpcLookupMetaService).Path, s.LookupMetaService)
-	mux.HandleFunc(p.RPC(api.RpcAddMetaService).Path, s.AddMetaService)
-	mux.HandleFunc(p.RPC(api.RpcLookupDataService).Path, s.LookupDataService)
-	mux.HandleFunc(p.RPC(api.RpcAddDataService).Path, s.AddDataService)
+	mux.HandleFunc(p.RPC(api.RpcGetMembers).Path, s.HandleGetMembers)
+	mux.HandleFunc(p.RPC(api.RpcAskLeader).Path, s.HandleAskLeader)
+	mux.HandleFunc(p.RPC(api.RpcLookupMetaService).Path, s.HandleLookupMetaService)
+	mux.HandleFunc(p.RPC(api.RpcAddMetaService).Path, s.HandleAddMetaService)
+	mux.HandleFunc(p.RPC(api.RpcLookupDataService).Path, s.HandleLookupDataService)
+	mux.HandleFunc(p.RPC(api.RpcAddDataService).Path, s.HandleAddDataService)
 	s.server = &http.Server{
 		Addr:     s.config.Host,
 		Handler:  mux,
@@ -188,89 +179,80 @@ func (s *placerServer) Shutdown(ctx context.Context) error {
 	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
 }
 
-func (s *placerServer) Members(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleGetMembers(w http.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
-	jsonhttp.W(w).OK(s.fsm.Members())
+	jsonhttp.W(w).OK(s.GetMembers().Configuration())
 }
 
-func (s *placerServer) Leader(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleAskLeader(w http.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
 	jw := jsonhttp.W(w)
-	l, err := s.fsm.Leader(nil)
+	info, err := s.AskLeader(nil)
 	if err != nil {
 		jw.Err(err)
 		return
 	}
-	jw.OK(l)
+	jw.OK(info)
 }
 
-func (s *placerServer) LookupMetaService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleLookupMetaService(w http.ResponseWriter, r *http.Request) {
 	// TODO
-	_, _ = s.fsm.LookupMetaService(nil)
+	_, _ = s.LookupMetaService(nil)
 }
 
-func (s *placerServer) AddMetaService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleAddMetaService(w http.ResponseWriter, r *http.Request) {
 	// TODO
-	_ = s.fsm.AddMetaService()
+	_ = s.AddMetaService()
 }
 
-func (s *placerServer) LookupDataService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleLookupDataService(w http.ResponseWriter, r *http.Request) {
 	// TODO
-	_, _ = s.fsm.LookupDataService(nil)
+	_, _ = s.LookupDataService(nil)
 }
 
-func (s *placerServer) AddDataService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleAddDataService(w http.ResponseWriter, r *http.Request) {
 	// TODO
-	_ = s.fsm.AddDataService()
+	_ = s.AddDataService()
 }
 
-type placerFSM struct {
-	// FIXME: Any locks here?
-	peers    api.Peers
-	self     api.Peer
-	leader   api.Peer
-	isLeader bool
-}
-
-func (p *placerFSM) Apply(log *raft.Log) interface{} {
+func (s *placerServer) Apply(log *raft.Log) interface{} {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (p *placerFSM) Snapshot() (raft.FSMSnapshot, error) {
+func (s *placerServer) Snapshot() (raft.FSMSnapshot, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (p *placerFSM) Restore(snapshot io.ReadCloser) error {
+func (s *placerServer) Restore(snapshot io.ReadCloser) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (p *placerFSM) Members() api.Peers {
-	return p.peers
+func (s *placerServer) GetMembers() api.Peers { return s.config.Peers }
+
+func (s *placerServer) AskLeader(api.Peer) (*api.PeerInfo, error) {
+	leader, id := s.rn.LeaderWithID()
+	return &api.PeerInfo{ID: id, Peer: peers.TCPVoter(leader)}, nil
 }
 
-func (p *placerFSM) Leader(api.Peer) (api.Peer, error) {
-	return p.leader, nil
-}
-
-func (p *placerFSM) LookupMetaService(key api.MetaKey) (api.MetaService, error) {
+func (s *placerServer) LookupMetaService(key api.MetaKey) (api.MetaService, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (p *placerFSM) AddMetaService() error {
+func (s *placerServer) AddMetaService() error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (p *placerFSM) LookupDataService(id api.DataPartitionID) (api.DataService, error) {
+func (s *placerServer) LookupDataService(id api.DataPartitionID) (api.DataService, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (p *placerFSM) AddDataService() error {
+func (s *placerServer) AddDataService() error {
 	//TODO implement me
 	panic("implement me")
 }

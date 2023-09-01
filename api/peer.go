@@ -36,3 +36,8 @@ type Peer interface {
 	json.Marshaler
 	json.Unmarshaler
 }
+
+type PeerInfo struct {
+	ID   raft.ServerID
+	Peer Peer
+}
