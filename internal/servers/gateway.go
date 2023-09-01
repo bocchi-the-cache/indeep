@@ -1,11 +1,13 @@
 package servers
 
 import (
+	"context"
 	"flag"
 	"net/http"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
+	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
@@ -18,6 +20,13 @@ type GatewayConfig struct {
 	rawPlacerPeers string
 }
 
+func DefaultGatewayConfig() *GatewayConfig {
+	return &GatewayConfig{
+		Host:   DefaultGatewayHost,
+		Placer: clients.PlacerConfig{Peers: DefaultPlacerPeers},
+	}
+}
+
 type gateway struct {
 	config *GatewayConfig
 	server *http.Server
@@ -28,17 +37,17 @@ type gateway struct {
 }
 
 func NewGateway(c *GatewayConfig) api.Server { return &gateway{config: c} }
-func Gateway() api.Server                    { return NewGateway(new(GatewayConfig)) }
+func Gateway() api.Server                    { return NewGateway(DefaultGatewayConfig()) }
 
 func (*gateway) Name() string { return "gateway" }
 
 func (g *gateway) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&g.config.Host, "host", DefaultGatewayHost, "listen host")
-	f.StringVar(&g.config.rawPlacerPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
+	f.StringVar(&g.config.rawPlacerPeers, "peers", DefaultPlacerPeersURL, "placer peers URL")
 }
 
 func (g *gateway) Setup() error {
-	if g.config.Placer.Peers == nil {
+	if g.config.rawPlacerPeers != "" {
 		ps, err := peers.ParsePeers(g.config.rawPlacerPeers)
 		if err != nil {
 			return err
@@ -55,9 +64,14 @@ func (g *gateway) Setup() error {
 	// TODO
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
-	g.server = &http.Server{Addr: g.config.Host, Handler: mux}
+	g.server = &http.Server{
+		Addr:     g.config.Host,
+		Handler:  mux,
+		ErrorLog: logs.E,
+	}
 
 	return nil
 }
 
-func (g *gateway) Server() *http.Server { return g.server }
+func (g *gateway) ListenAndServe() error              { return g.server.ListenAndServe() }
+func (g *gateway) Shutdown(ctx context.Context) error { return g.server.Shutdown(ctx) }

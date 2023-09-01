@@ -1,8 +1,8 @@
 package api
 
 import (
+	"context"
 	"flag"
-	"net/http"
 )
 
 type App interface {
@@ -13,5 +13,7 @@ type App interface {
 
 type Server interface {
 	App
-	Server() *http.Server
+
+	ListenAndServe() error
+	Shutdown(ctx context.Context) error
 }

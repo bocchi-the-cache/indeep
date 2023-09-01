@@ -4,19 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-)
 
-type PeerID string
+	"github.com/hashicorp/raft"
+)
 
 type Peers interface {
 	fmt.Stringer
 
-	IDs() []PeerID
+	IDs() []raft.ServerID
 	Peers() []Peer
+	Configuration() raft.Configuration
 
-	Lookup(id PeerID) Peer
-	Join(id PeerID, peer Peer) Peers
-	Quit(id PeerID)
+	Lookup(id raft.ServerID) Peer
+	Join(id raft.ServerID, peer Peer) Peers
+	Quit(id raft.ServerID)
 
 	json.Marshaler
 	json.Unmarshaler
@@ -27,6 +28,8 @@ type Peer interface {
 
 	URL() *url.URL
 	Operation(op string) *url.URL
+
+	Suffrage() raft.ServerSuffrage
 
 	json.Marshaler
 	json.Unmarshaler

@@ -1,57 +1,107 @@
 package servers
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
-	"net/url"
+	"path/filepath"
+	"time"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/raft"
+	raftboltdb "github.com/hashicorp/raft-boltdb"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
+	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
 const (
-	DefaultPlacerID   = "placer0"
-	DefaultPlacerHost = "127.0.0.1:11402"
+	DefaultPlacerHost     = "127.0.0.1:11451"
+	DefaultPlacerID       = "placer0"
+	DefaultPlacerURL      = "http://127.0.0.1:11551"
+	DefaultPlacerPeersURL = DefaultPlacerURL + peers.IDsPrefix + DefaultPlacerID
+	DefaultSnapshotDir    = "."
+	DefaultSnapshotRetain = 10
+	DefaultLogDBFile      = "placer.log.bolt"
+	DefaultLogCacheCap    = 128
+	DefaultStableDBFile   = "placer.stable.bolt"
+	DefaultPeersConnPool  = 10
+	DefaultPeersIOTimeout = 15 * time.Second
 )
 
 var (
 	ErrPlacerUnknownID = errors.New("unknown placer ID")
 
-	DefaultPlacerRawPeers = (&url.URL{
-		Scheme: peers.DefaultScheme,
-		Host:   DefaultPlacerHost,
-		Path:   peers.IDsPrefix + DefaultPlacerID,
-	}).String()
+	DefaultPlacerPeers, _ = peers.ParsePeerURLs([2]string{DefaultPlacerID, DefaultPlacerURL})
+	DefaultLogDBPath      = filepath.Join(DefaultSnapshotDir, DefaultLogDBFile)
+	DefaultStableDBPath   = filepath.Join(DefaultSnapshotDir, DefaultStableDBFile)
 )
 
 type PlacerConfig struct {
-	ID    api.PeerID
-	Peers api.Peers
+	Host           string
+	ID             raft.ServerID
+	Peers          api.Peers
+	SnapshotDir    string
+	SnapshotRetain int
+	LogDBPath      string
+	LogCacheCap    int
+	StableDBPath   string
+	PeersConnPool  int
+	PeersIOTimeout time.Duration
 
 	rawPeers string
+}
+
+func DefaultPlacerConfig() *PlacerConfig {
+	return &PlacerConfig{
+		Host:           DefaultPlacerHost,
+		ID:             DefaultPlacerID,
+		Peers:          DefaultPlacerPeers,
+		SnapshotDir:    DefaultSnapshotDir,
+		SnapshotRetain: DefaultSnapshotRetain,
+		LogDBPath:      DefaultLogDBPath,
+		LogCacheCap:    DefaultLogCacheCap,
+		StableDBPath:   DefaultStableDBPath,
+		PeersConnPool:  DefaultPeersConnPool,
+		PeersIOTimeout: DefaultPeersIOTimeout,
+	}
+}
+
+func (c *PlacerConfig) hcLogger(name string) hclog.Logger {
+	return logs.HcLogger(fmt.Sprintf("%s-%s", c.ID, name))
 }
 
 type placerServer struct {
 	config *PlacerConfig
 	server *http.Server
 	fsm    *placerFSM
+	rn     *raft.Raft
 }
 
 func NewPlacer(c *PlacerConfig) api.Server { return &placerServer{config: c} }
-func Placer() api.Server                   { return NewPlacer(new(PlacerConfig)) }
+func Placer() api.Server                   { return NewPlacer(DefaultPlacerConfig()) }
 
 func (*placerServer) Name() string { return "placer" }
 
 func (s *placerServer) DefineFlags(f *flag.FlagSet) {
+	f.StringVar(&s.config.Host, "host", DefaultPlacerHost, "listen host")
 	f.StringVar((*string)(&s.config.ID), "id", DefaultPlacerID, "placer ID")
-	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerRawPeers, "full placer peers")
+	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerPeersURL, "placer peers URL")
+	f.StringVar(&s.config.SnapshotDir, "snap-dir", DefaultSnapshotDir, "Raft snapshot base directory")
+	f.IntVar(&s.config.SnapshotRetain, "snap-retain", DefaultSnapshotRetain, "Raft snapshots to retain")
+	f.StringVar(&s.config.LogDBPath, "logdb", DefaultLogDBPath, "Raft log store path")
+	f.IntVar(&s.config.LogCacheCap, "logcache-cap", DefaultLogCacheCap, "Raft log cache capacity")
+	f.StringVar(&s.config.StableDBPath, "stabledb", DefaultStableDBPath, "Raft stable store path")
+	f.IntVar(&s.config.PeersConnPool, "conn-pool", DefaultPeersConnPool, "peer connections to pool")
 }
 
 func (s *placerServer) Setup() error {
-	if s.config.Peers == nil {
+	if s.config.rawPeers != "" {
 		ps, err := peers.ParsePeers(s.config.rawPeers)
 		if err != nil {
 			return err
@@ -61,7 +111,31 @@ func (s *placerServer) Setup() error {
 
 	p := s.config.Peers.Lookup(s.config.ID)
 	if p == nil {
-		return fmt.Errorf("%w: id=%s", ErrPlacerUnknownID, s.config.ID)
+		return fmt.Errorf("%w: peers=%s, id=%s", ErrPlacerUnknownID, s.config.Peers, s.config.ID)
+	}
+
+	config := raft.DefaultConfig()
+	config.LocalID = raft.ServerID(s.config.ID)
+	config.Logger = s.config.hcLogger("raft")
+
+	snaps, err := raft.NewFileSnapshotStoreWithLogger(
+		s.config.SnapshotDir,
+		s.config.SnapshotRetain,
+		s.config.hcLogger("snaps"),
+	)
+	if err != nil {
+		return err
+	}
+
+	trans, err := raft.NewTCPTransportWithLogger(
+		p.URL().Host,
+		nil,
+		s.config.PeersConnPool,
+		s.config.PeersIOTimeout,
+		s.config.hcLogger("trans"),
+	)
+	if err != nil {
+		return err
 	}
 
 	// TODO
@@ -72,6 +146,27 @@ func (s *placerServer) Setup() error {
 		isLeader: true,
 	}
 
+	logDB, err := raftboltdb.New(raftboltdb.Options{Path: s.config.LogDBPath})
+	if err != nil {
+		return err
+	}
+	cachedLogDB, err := raft.NewLogCache(s.config.LogCacheCap, logDB)
+	if err != nil {
+		return err
+	}
+
+	stableDB, err := raftboltdb.New(raftboltdb.Options{Path: s.config.StableDBPath})
+	if err != nil {
+		return err
+	}
+
+	rn, err := raft.NewRaft(config, s.fsm, cachedLogDB, stableDB, snaps, trans)
+	if err != nil {
+		return err
+	}
+	s.rn = rn
+	s.rn.BootstrapCluster(s.config.Peers.Configuration())
+
 	mux := http.NewServeMux()
 	mux.HandleFunc(peers.OperationGetMembers, s.Members)
 	mux.HandleFunc(peers.OperationAskLeader, s.Leader)
@@ -79,12 +174,19 @@ func (s *placerServer) Setup() error {
 	mux.HandleFunc(peers.OperationAddMetaService, s.AddMetaService)
 	mux.HandleFunc(peers.OperationLookupDataService, s.LookupDataService)
 	mux.HandleFunc(peers.OperationAddDataService, s.AddDataService)
-	s.server = &http.Server{Addr: p.URL().Host, Handler: mux}
+	s.server = &http.Server{
+		Addr:     s.config.Host,
+		Handler:  mux,
+		ErrorLog: logs.E,
+	}
 
 	return nil
 }
 
-func (s *placerServer) Server() *http.Server { return s.server }
+func (s *placerServer) ListenAndServe() error { return s.server.ListenAndServe() }
+func (s *placerServer) Shutdown(ctx context.Context) error {
+	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
+}
 
 func (s *placerServer) Members(w http.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
@@ -128,6 +230,21 @@ type placerFSM struct {
 	self     api.Peer
 	leader   api.Peer
 	isLeader bool
+}
+
+func (p *placerFSM) Apply(log *raft.Log) interface{} {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (p *placerFSM) Snapshot() (raft.FSMSnapshot, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (p *placerFSM) Restore(snapshot io.ReadCloser) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (p *placerFSM) Members() api.Peers {

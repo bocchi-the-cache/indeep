@@ -29,11 +29,9 @@ func RunServer(s api.Server, args []string) {
 		logs.E.Fatal(err)
 	}
 
-	server := s.Server()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		if err := s.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			logs.E.Println(err)
 		}
 		cancel()
@@ -43,7 +41,7 @@ func RunServer(s api.Server, args []string) {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 
-	if err := server.Shutdown(context.Background()); err != nil {
+	if err := s.Shutdown(context.Background()); err != nil {
 		logs.E.Println(err)
 	}
 	<-ctx.Done()

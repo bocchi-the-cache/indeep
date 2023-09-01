@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/hashicorp/raft"
+
 	"github.com/bocchi-the-cache/indeep/api"
 )
 
@@ -29,7 +31,7 @@ var (
 	ErrMapMismatched = errors.New("map mismatched")
 )
 
-type peers struct{ m map[api.PeerID]api.Peer }
+type peers struct{ m map[raft.ServerID]api.Peer }
 
 func (p *peers) String() string {
 	var (
@@ -48,7 +50,17 @@ func (p *peers) String() string {
 	return u.String()
 }
 
-func DefaultPeers() api.Peers { return new(peers) }
+func ParsePeerURLs(rawURLs ...[2]string) (api.Peers, error) {
+	m := make(map[raft.ServerID]api.Peer)
+	for _, pair := range rawURLs {
+		p, err := ParsePeer(pair[1])
+		if err != nil {
+			return nil, err
+		}
+		m[raft.ServerID(pair[0])] = p
+	}
+	return &peers{m}, nil
+}
 
 func ParsePeers(rawURL string) (api.Peers, error) {
 	m, err := parsePeers(rawURL)
@@ -58,7 +70,7 @@ func ParsePeers(rawURL string) (api.Peers, error) {
 	return &peers{m}, nil
 }
 
-func parsePeers(rawURL string) (map[api.PeerID]api.Peer, error) {
+func parsePeers(rawURL string) (map[raft.ServerID]api.Peer, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
@@ -79,16 +91,16 @@ func parsePeers(rawURL string) (map[api.PeerID]api.Peer, error) {
 		return nil, fmt.Errorf("%w: hosts=%v, ids=%v", ErrMapMismatched, hosts, ids)
 	}
 
-	m := make(map[api.PeerID]api.Peer)
+	m := make(map[raft.ServerID]api.Peer)
 	for i, host := range hosts {
-		id := api.PeerID(ids[i])
+		id := raft.ServerID(ids[i])
 		m[id] = &peer{u: &url.URL{Scheme: DefaultScheme, Host: host}}
 	}
 
 	return m, nil
 }
 
-func (p *peers) IDs() (ret []api.PeerID) {
+func (p *peers) IDs() (ret []raft.ServerID) {
 	for id := range p.m {
 		ret = append(ret, id)
 	}
@@ -102,16 +114,27 @@ func (p *peers) Peers() (ret []api.Peer) {
 	return
 }
 
-func (p *peers) Lookup(id api.PeerID) api.Peer { return p.m[id] }
+func (p *peers) Configuration() (c raft.Configuration) {
+	for id, peer := range p.m {
+		c.Servers = append(c.Servers, raft.Server{
+			Suffrage: peer.Suffrage(),
+			ID:       id,
+			Address:  raft.ServerAddress(peer.URL().Host),
+		})
+	}
+	return
+}
 
-func (p *peers) Join(id api.PeerID, peer api.Peer) api.Peers {
+func (p *peers) Lookup(id raft.ServerID) api.Peer { return p.m[id] }
+
+func (p *peers) Join(id raft.ServerID, peer api.Peer) api.Peers {
 	if _, ok := p.m[id]; !ok {
 		p.m[id] = peer
 	}
 	return p
 }
 
-func (p *peers) Quit(id api.PeerID) { delete(p.m, id) }
+func (p *peers) Quit(id raft.ServerID) { delete(p.m, id) }
 
 func (p *peers) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
 
@@ -141,9 +164,9 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 		return fmt.Errorf("%w: hosts=%v, ids=%v", ErrMapMismatched, hosts, ids)
 	}
 
-	m := make(map[api.PeerID]api.Peer)
+	m := make(map[raft.ServerID]api.Peer)
 	for i, host := range hosts {
-		id := api.PeerID(ids[i])
+		id := raft.ServerID(ids[i])
 		m[id] = &peer{u: &url.URL{Scheme: DefaultScheme, Host: host}}
 	}
 	p.m = m
@@ -151,16 +174,19 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 	return nil
 }
 
-type peer struct{ u *url.URL }
+type peer struct {
+	u *url.URL
+	s raft.ServerSuffrage
+}
 
 func DefaultPeer() api.Peer { return new(peer) }
 
 func ParsePeer(rawURL string) (api.Peer, error) {
-	p, err := parsePeer(rawURL)
+	u, err := parsePeer(rawURL)
 	if err != nil {
 		return nil, err
 	}
-	return &peer{p}, nil
+	return &peer{u: u}, nil
 }
 
 var parsePeer = url.Parse
@@ -174,6 +200,8 @@ func (p *peer) Operation(op string) *url.URL {
 	u.Path = op
 	return u
 }
+
+func (p *peer) Suffrage() raft.ServerSuffrage { return p.s }
 
 func (p *peer) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
 
