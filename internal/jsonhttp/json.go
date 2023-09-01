@@ -30,38 +30,38 @@ func WithStatusCode(err error, c int) error { return &withStatusCode{error: err,
 func (w *withStatusCode) StatusCode() int   { return w.c }
 
 type (
-	JSONResponseWriter interface {
+	ResponseWriter interface {
 		OK(v any)
 		Err(err error)
 	}
 
-	jsonRespWriter struct{ w http.ResponseWriter }
+	respWriter struct{ w http.ResponseWriter }
 )
 
-func W(w http.ResponseWriter) JSONResponseWriter { return &jsonRespWriter{w} }
+func W(w http.ResponseWriter) ResponseWriter { return &respWriter{w} }
 
-func (j *jsonRespWriter) OK(v any) {
+func (w *respWriter) OK(v any) {
 	data, err := json.Marshal(v)
 	if err != nil {
-		j.Err(err)
+		w.Err(err)
 		return
 	}
-	j.write(http.StatusOK, data)
+	w.write(http.StatusOK, data)
 }
 
-func (j *jsonRespWriter) Err(err error) {
+func (w *respWriter) Err(err error) {
 	statusCode := http.StatusInternalServerError
 	if c, ok := err.(StatusCoder); ok {
 		statusCode = c.StatusCode()
 	}
 	data, _ := json.Marshal(struct{ Msg string }{err.Error()})
-	j.write(statusCode, data)
+	w.write(statusCode, data)
 }
 
-func (j *jsonRespWriter) write(statusCode int, data []byte) {
-	j.w.Header().Add("Content-Type", "application/json")
-	j.w.WriteHeader(statusCode)
-	if _, err := j.w.Write(data); err != nil {
+func (w *respWriter) write(statusCode int, data []byte) {
+	w.w.Header().Add("Content-Type", "application/json")
+	w.w.WriteHeader(statusCode)
+	if _, err := w.w.Write(data); err != nil {
 		logs.E.Println("write error:", err)
 	}
 }

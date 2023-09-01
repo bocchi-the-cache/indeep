@@ -1,12 +1,12 @@
 package api
 
 const (
-	RpcGetMembers        = "get-members"
-	RpcAskLeader         = "ask-leader"
-	RpcLookupMetaService = "lookup-meta-service"
-	RpcAddMetaService    = "add-meta-service"
-	RpcLookupDataService = "lookup-data-service"
-	RpcAddDataService    = "add-data-service"
+	RpcGetMembers        RpcID = "get-members"
+	RpcAskLeader         RpcID = "ask-leader"
+	RpcLookupMetaService RpcID = "lookup-meta-service"
+	RpcAddMetaService    RpcID = "add-meta-service"
+	RpcLookupDataService RpcID = "lookup-data-service"
+	RpcAddDataService    RpcID = "add-data-service"
 )
 
 type Placer interface {

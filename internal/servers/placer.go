@@ -158,16 +158,17 @@ func (s *placerServer) Setup() error {
 	s.rn = rn
 	s.rn.BootstrapCluster(s.config.Peers.Configuration())
 
-	mux := http.NewServeMux()
-	mux.HandleFunc(p.RPC(api.RpcGetMembers).Path, s.HandleGetMembers)
-	mux.HandleFunc(p.RPC(api.RpcAskLeader).Path, s.HandleAskLeader)
-	mux.HandleFunc(p.RPC(api.RpcLookupMetaService).Path, s.HandleLookupMetaService)
-	mux.HandleFunc(p.RPC(api.RpcAddMetaService).Path, s.HandleAddMetaService)
-	mux.HandleFunc(p.RPC(api.RpcLookupDataService).Path, s.HandleLookupDataService)
-	mux.HandleFunc(p.RPC(api.RpcAddDataService).Path, s.HandleAddDataService)
 	s.server = &http.Server{
-		Addr:     s.config.Host,
-		Handler:  mux,
+		Addr: s.config.Host,
+		Handler: peers.
+			Mux(p).
+			HandleFunc(api.RpcGetMembers, s.HandleGetMembers).
+			HandleFunc(api.RpcAskLeader, s.HandleAskLeader).
+			HandleFunc(api.RpcLookupMetaService, s.HandleLookupMetaService).
+			HandleFunc(api.RpcAddMetaService, s.HandleAddMetaService).
+			HandleFunc(api.RpcLookupDataService, s.HandleLookupDataService).
+			HandleFunc(api.RpcAddDataService, s.HandleAddDataService).
+			Build(),
 		ErrorLog: logs.E,
 	}
 
@@ -179,38 +180,37 @@ func (s *placerServer) Shutdown(ctx context.Context) error {
 	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
 }
 
-func (s *placerServer) HandleGetMembers(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleGetMembers(w jsonhttp.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
-	jsonhttp.W(w).OK(s.GetMembers().Configuration())
+	w.OK(s.GetMembers().Configuration())
 }
 
-func (s *placerServer) HandleAskLeader(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleAskLeader(w jsonhttp.ResponseWriter, r *http.Request) {
 	_ = r.Body.Close()
-	jw := jsonhttp.W(w)
 	info, err := s.AskLeader(nil)
 	if err != nil {
-		jw.Err(err)
+		w.Err(err)
 		return
 	}
-	jw.OK(info)
+	w.OK(info)
 }
 
-func (s *placerServer) HandleLookupMetaService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleLookupMetaService(w jsonhttp.ResponseWriter, r *http.Request) {
 	// TODO
 	_, _ = s.LookupMetaService(nil)
 }
 
-func (s *placerServer) HandleAddMetaService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleAddMetaService(w jsonhttp.ResponseWriter, r *http.Request) {
 	// TODO
 	_ = s.AddMetaService()
 }
 
-func (s *placerServer) HandleLookupDataService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleLookupDataService(w jsonhttp.ResponseWriter, r *http.Request) {
 	// TODO
 	_, _ = s.LookupDataService(nil)
 }
 
-func (s *placerServer) HandleAddDataService(w http.ResponseWriter, r *http.Request) {
+func (s *placerServer) HandleAddDataService(w jsonhttp.ResponseWriter, r *http.Request) {
 	// TODO
 	_ = s.AddDataService()
 }

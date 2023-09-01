@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/hashicorp/raft"
 
 	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
 )
 
 const (
@@ -219,3 +221,24 @@ func (p *peer) UnmarshalJSON(bytes []byte) error {
 	p.u = u
 	return nil
 }
+
+type (
+	PeerMux interface {
+		HandleFunc(rpc api.RpcID, f func(w jsonhttp.ResponseWriter, r *http.Request)) PeerMux
+		Build() *http.ServeMux
+	}
+
+	peerMux struct {
+		p api.Peer
+		m *http.ServeMux
+	}
+)
+
+func Mux(p api.Peer) PeerMux { return &peerMux{p: p, m: http.NewServeMux()} }
+
+func (s *peerMux) HandleFunc(rpc api.RpcID, f func(w jsonhttp.ResponseWriter, r *http.Request)) PeerMux {
+	s.m.HandleFunc(s.p.RPC(rpc).String(), func(w http.ResponseWriter, r *http.Request) { f(jsonhttp.W(w), r) })
+	return s
+}
+
+func (s *peerMux) Build() *http.ServeMux { return s.m }
