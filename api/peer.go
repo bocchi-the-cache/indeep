@@ -8,6 +8,8 @@ import (
 	"github.com/hashicorp/raft"
 )
 
+type RpcID string
+
 type Peers interface {
 	fmt.Stringer
 
@@ -27,7 +29,7 @@ type Peer interface {
 	fmt.Stringer
 
 	URL() *url.URL
-	Operation(op string) *url.URL
+	RPC(id RpcID) *url.URL
 
 	Suffrage() raft.ServerSuffrage
 

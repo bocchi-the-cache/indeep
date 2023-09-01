@@ -37,7 +37,7 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 func (c *placerClient) Members() api.Peers { return c.members }
 
 func (c *placerClient) Leader(e api.Peer) (api.Peer, error) {
-	resp, err := c.h.Get(e.Operation(peers.OperationAskLeader).String())
+	resp, err := c.h.Get(e.RPC(api.RpcAskLeader).String())
 	if err != nil {
 		return nil, err
 	}

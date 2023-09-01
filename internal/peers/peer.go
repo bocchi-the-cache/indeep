@@ -13,25 +13,22 @@ import (
 )
 
 const (
-	OperationGetMembers        = "/get-members"
-	OperationAskLeader         = "/ask-leader"
-	OperationLookupMetaService = "/lookup-meta-service"
-	OperationAddMetaService    = "/add-meta-service"
-	OperationLookupDataService = "/lookup-data-service"
-	OperationAddDataService    = "/add-data-service"
-
-	DefaultScheme = "http"
-	IDsPrefix     = "/"
-	mapSep        = ","
+	IDsPrefix = "/"
+	OpPrefix
+	mapSep = ","
 )
 
 var (
-	ErrEmptyHosts    = errors.New("empty hosts")
-	ErrEmptyIDs      = errors.New("empty peer IDs")
-	ErrMapMismatched = errors.New("map mismatched")
+	ErrSchemeMismatched = errors.New("scheme mismatched")
+	ErrEmptyHosts       = errors.New("empty hosts")
+	ErrEmptyIDs         = errors.New("empty peer IDs")
+	ErrMapMismatched    = errors.New("map mismatched")
 )
 
-type peers struct{ m map[raft.ServerID]api.Peer }
+type peers struct {
+	scheme string
+	m      map[raft.ServerID]api.Peer
+}
 
 func (p *peers) String() string {
 	var (
@@ -43,7 +40,7 @@ func (p *peers) String() string {
 		hosts = append(hosts, e.URL().Host)
 	}
 	u := &url.URL{
-		Scheme: DefaultScheme,
+		Scheme: p.scheme,
 		Host:   strings.Join(hosts, mapSep),
 		Path:   IDsPrefix + strings.Join(ids, mapSep),
 	}
@@ -51,53 +48,59 @@ func (p *peers) String() string {
 }
 
 func ParsePeerURLs(rawURLs ...[2]string) (api.Peers, error) {
+	var peersScheme *string
 	m := make(map[raft.ServerID]api.Peer)
 	for _, pair := range rawURLs {
 		p, err := ParsePeer(pair[1])
 		if err != nil {
 			return nil, err
 		}
+		scheme := p.URL().Scheme
+		if peersScheme != nil && *peersScheme != scheme {
+			return nil, fmt.Errorf("%w: rawURLs=%v", ErrSchemeMismatched, rawURLs)
+		}
+		peersScheme = &scheme
 		m[raft.ServerID(pair[0])] = p
 	}
-	return &peers{m}, nil
+	return &peers{scheme: *peersScheme, m: m}, nil
 }
 
 func ParsePeers(rawURL string) (api.Peers, error) {
-	m, err := parsePeers(rawURL)
+	s, m, err := parsePeers(rawURL)
 	if err != nil {
 		return nil, err
 	}
-	return &peers{m}, nil
+	return &peers{scheme: s, m: m}, nil
 }
 
-func parsePeers(rawURL string) (map[raft.ServerID]api.Peer, error) {
+func parsePeers(rawURL string) (string, map[raft.ServerID]api.Peer, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	if u.Host == "" {
-		return nil, ErrEmptyHosts
+		return "", nil, ErrEmptyHosts
 	}
 	hosts := strings.Split(u.Host, mapSep)
 
 	rawPath := strings.TrimLeft(u.Path, IDsPrefix)
 	if rawPath == "" {
-		return nil, ErrEmptyIDs
+		return "", nil, ErrEmptyIDs
 	}
 	ids := strings.Split(rawPath, mapSep)
 
 	if len(hosts) != len(ids) {
-		return nil, fmt.Errorf("%w: hosts=%v, ids=%v", ErrMapMismatched, hosts, ids)
+		return "", nil, fmt.Errorf("%w: hosts=%v, ids=%v", ErrMapMismatched, hosts, ids)
 	}
 
 	m := make(map[raft.ServerID]api.Peer)
 	for i, host := range hosts {
 		id := raft.ServerID(ids[i])
-		m[id] = &peer{u: &url.URL{Scheme: DefaultScheme, Host: host}}
+		m[id] = &peer{u: &url.URL{Scheme: u.Scheme, Host: host}}
 	}
 
-	return m, nil
+	return u.Scheme, m, nil
 }
 
 func (p *peers) IDs() (ret []raft.ServerID) {
@@ -167,7 +170,7 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 	m := make(map[raft.ServerID]api.Peer)
 	for i, host := range hosts {
 		id := raft.ServerID(ids[i])
-		m[id] = &peer{u: &url.URL{Scheme: DefaultScheme, Host: host}}
+		m[id] = &peer{u: &url.URL{Scheme: p.scheme, Host: host}}
 	}
 	p.m = m
 
@@ -192,13 +195,9 @@ func ParsePeer(rawURL string) (api.Peer, error) {
 var parsePeer = url.Parse
 
 func (p *peer) String() string { return p.u.String() }
-
-func (p *peer) URL() *url.URL { return &url.URL{Scheme: p.u.Scheme, Host: p.u.Host} }
-
-func (p *peer) Operation(op string) *url.URL {
-	u := p.URL()
-	u.Path = op
-	return u
+func (p *peer) URL() *url.URL  { return p.u }
+func (p *peer) RPC(id api.RpcID) *url.URL {
+	return &url.URL{Scheme: p.u.Scheme, Host: p.u.Host, Path: OpPrefix + string(id)}
 }
 
 func (p *peer) Suffrage() raft.ServerSuffrage { return p.s }

@@ -23,7 +23,7 @@ import (
 const (
 	DefaultPlacerHost     = "127.0.0.1:11451"
 	DefaultPlacerID       = "placer0"
-	DefaultPlacerURL      = "http://127.0.0.1:11551"
+	DefaultPlacerURL      = "tcp://127.0.0.1:11551"
 	DefaultPlacerPeersURL = DefaultPlacerURL + peers.IDsPrefix + DefaultPlacerID
 	DefaultSnapshotDir    = "."
 	DefaultSnapshotRetain = 10
@@ -115,7 +115,7 @@ func (s *placerServer) Setup() error {
 	}
 
 	config := raft.DefaultConfig()
-	config.LocalID = raft.ServerID(s.config.ID)
+	config.LocalID = s.config.ID
 	config.Logger = s.config.hcLogger("raft")
 
 	snaps, err := raft.NewFileSnapshotStoreWithLogger(
@@ -168,12 +168,12 @@ func (s *placerServer) Setup() error {
 	s.rn.BootstrapCluster(s.config.Peers.Configuration())
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(peers.OperationGetMembers, s.Members)
-	mux.HandleFunc(peers.OperationAskLeader, s.Leader)
-	mux.HandleFunc(peers.OperationLookupMetaService, s.LookupMetaService)
-	mux.HandleFunc(peers.OperationAddMetaService, s.AddMetaService)
-	mux.HandleFunc(peers.OperationLookupDataService, s.LookupDataService)
-	mux.HandleFunc(peers.OperationAddDataService, s.AddDataService)
+	mux.HandleFunc(p.RPC(api.RpcGetMembers).Path, s.Members)
+	mux.HandleFunc(p.RPC(api.RpcAskLeader).Path, s.Leader)
+	mux.HandleFunc(p.RPC(api.RpcLookupMetaService).Path, s.LookupMetaService)
+	mux.HandleFunc(p.RPC(api.RpcAddMetaService).Path, s.AddMetaService)
+	mux.HandleFunc(p.RPC(api.RpcLookupDataService).Path, s.LookupDataService)
+	mux.HandleFunc(p.RPC(api.RpcAddDataService).Path, s.AddDataService)
 	s.server = &http.Server{
 		Addr:     s.config.Host,
 		Handler:  mux,
