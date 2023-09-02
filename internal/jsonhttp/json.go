@@ -62,6 +62,6 @@ func (w *respWriter) write(statusCode int, data []byte) {
 	w.w.Header().Add("Content-Type", "application/json")
 	w.w.WriteHeader(statusCode)
 	if _, err := w.w.Write(data); err != nil {
-		logs.E.Println("write error:", err)
+		logs.S.Error("write error", "err", err)
 	}
 }

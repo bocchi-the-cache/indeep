@@ -1,5 +1,9 @@
 package api
 
+const (
+	DefaultMetaserverHost = "127.0.0.1:11651"
+)
+
 type MetaKey interface {
 	ClientID() string
 	Bucket() string

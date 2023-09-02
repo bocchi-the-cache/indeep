@@ -11,8 +11,6 @@ import (
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
-const DefaultGatewayHost = "127.0.0.1:11401"
-
 type GatewayConfig struct {
 	Host   string
 	Placer clients.PlacerConfig
@@ -22,15 +20,17 @@ type GatewayConfig struct {
 
 func DefaultGatewayConfig() *GatewayConfig {
 	return &GatewayConfig{
-		Host:   DefaultGatewayHost,
-		Placer: clients.PlacerConfig{Peers: DefaultPlacerPeers},
+		Host: api.DefaultGatewayHost,
+		Placer: clients.PlacerConfig{
+			Peers:         DefaultPlacerPeers,
+			ClientTimeout: DefaultPeersIOTimeout,
+		},
 	}
 }
 
 type gateway struct {
-	config *GatewayConfig
-	server *http.Server
-
+	config   *GatewayConfig
+	server   *http.Server
 	placerCl api.Placer
 	metaCl   api.MetaService
 	dataCl   api.DataService
@@ -42,8 +42,8 @@ func Gateway() api.Server                    { return NewGateway(DefaultGatewayC
 func (*gateway) Name() string { return "gateway" }
 
 func (g *gateway) DefineFlags(f *flag.FlagSet) {
-	f.StringVar(&g.config.Host, "host", DefaultGatewayHost, "listen host")
-	f.StringVar(&g.config.rawPlacerPeers, "peers", DefaultPlacerPeersURL, "placer peers URL")
+	f.StringVar(&g.config.Host, "host", api.DefaultGatewayHost, "listen host")
+	f.StringVar(&g.config.rawPlacerPeers, "placer-hosts", DefaultPlacerHosts.String(), "placer hosts URL")
 }
 
 func (g *gateway) Setup() error {

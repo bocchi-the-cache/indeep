@@ -26,13 +26,14 @@ func MainServer(s api.Server) { RunServer(s, os.Args[1:]) }
 
 func RunServer(s api.Server, args []string) {
 	if err := Setup(s, args); err != nil {
-		logs.E.Fatal(err)
+		logs.S.Error("setup error", "err", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		if err := s.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			logs.E.Println(err)
+			logs.S.Error("listen error", "err", err)
 		}
 		cancel()
 	}()
@@ -42,7 +43,7 @@ func RunServer(s api.Server, args []string) {
 	<-sigCh
 
 	if err := s.Shutdown(context.Background()); err != nil {
-		logs.E.Println(err)
+		logs.S.Error("shutdown error", "err", err)
 	}
 	<-ctx.Done()
 }

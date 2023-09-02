@@ -15,15 +15,17 @@ import (
 )
 
 const (
+	HostScheme = "http"
+	RaftScheme = "tcp"
+
 	RootPath = "/"
 	mapSep   = ","
 )
 
 var (
-	ErrSchemeMismatched = errors.New("scheme mismatched")
-	ErrEmptyHosts       = errors.New("empty hosts")
-	ErrEmptyIDs         = errors.New("empty peer IDs")
-	ErrMapMismatched    = errors.New("map mismatched")
+	ErrEmptyHosts    = errors.New("empty hosts")
+	ErrEmptyIDs      = errors.New("empty peer IDs")
+	ErrMapMismatched = errors.New("map mismatched")
 )
 
 type peers struct {
@@ -31,22 +33,11 @@ type peers struct {
 	m      map[raft.ServerID]api.Peer
 }
 
-func ParsePeerURLs(rawURLs ...[2]string) (api.Peers, error) {
-	var peersScheme *string
-	m := make(map[raft.ServerID]api.Peer)
-	for _, pair := range rawURLs {
-		p, err := ParsePeer(pair[1])
-		if err != nil {
-			return nil, err
-		}
-		scheme := p.URL().Scheme
-		if peersScheme != nil && *peersScheme != scheme {
-			return nil, fmt.Errorf("%w: rawURLs=%v", ErrSchemeMismatched, rawURLs)
-		}
-		peersScheme = &scheme
-		m[raft.ServerID(pair[0])] = p
-	}
-	return &peers{scheme: *peersScheme, m: m}, nil
+func RaftPeers() api.Peers { return NewPeers(RaftScheme) }
+func HostPeers() api.Peers { return NewPeers(HostScheme) }
+
+func NewPeers(scheme string) api.Peers {
+	return &peers{scheme: scheme, m: make(map[raft.ServerID]api.Peer)}
 }
 
 func ParsePeers(rawURL string) (api.Peers, error) {
@@ -185,16 +176,8 @@ type peer struct {
 
 func DefaultPeer() api.Peer { return new(peer) }
 
-func ParsePeer(rawURL string) (api.Peer, error) {
-	u, err := parsePeer(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	return &peer{u: u}, nil
-}
-
-func TCPVoter(addr raft.ServerAddress) api.Peer {
-	return &peer{u: &url.URL{Scheme: "tcp", Host: string(addr)}}
+func Voter(addr raft.ServerAddress) api.Peer {
+	return &peer{u: &url.URL{Scheme: RaftScheme, Host: string(addr)}}
 }
 
 var parsePeer = url.Parse
@@ -237,7 +220,7 @@ type (
 func Mux(p api.Peer) PeerMux { return &peerMux{p: p, m: http.NewServeMux()} }
 
 func (s *peerMux) HandleFunc(rpc api.RpcID, f func(w jsonhttp.ResponseWriter, r *http.Request)) PeerMux {
-	s.m.HandleFunc(s.p.RPC(rpc).String(), func(w http.ResponseWriter, r *http.Request) { f(jsonhttp.W(w), r) })
+	s.m.HandleFunc(s.p.RPC(rpc).Path, func(w http.ResponseWriter, r *http.Request) { f(jsonhttp.W(w), r) })
 	return s
 }
 

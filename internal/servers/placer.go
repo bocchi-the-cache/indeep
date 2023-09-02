@@ -21,10 +21,6 @@ import (
 )
 
 const (
-	DefaultPlacerHost     = "127.0.0.1:11451"
-	DefaultPlacerID       = "placer0"
-	DefaultPlacerURL      = "tcp://127.0.0.1:11551"
-	DefaultPlacerPeersURL = DefaultPlacerURL + peers.RootPath + DefaultPlacerID
 	DefaultSnapshotDir    = "."
 	DefaultSnapshotRetain = 10
 	DefaultLogDBFile      = "placer.log.bolt"
@@ -37,9 +33,10 @@ const (
 var (
 	ErrPlacerUnknownID = errors.New("unknown placer ID")
 
-	DefaultPlacerPeers, _ = peers.ParsePeerURLs([2]string{DefaultPlacerID, DefaultPlacerURL})
-	DefaultLogDBPath      = filepath.Join(DefaultSnapshotDir, DefaultLogDBFile)
-	DefaultStableDBPath   = filepath.Join(DefaultSnapshotDir, DefaultStableDBFile)
+	DefaultPlacerPeers  = peers.RaftPeers().Join(api.DefaultPlacerID, peers.Voter(api.DefaultPlacerPeer))
+	DefaultPlacerHosts  = peers.HostPeers().Join(api.DefaultPlacerID, peers.Voter(api.DefaultPlacerHost))
+	DefaultLogDBPath    = filepath.Join(DefaultSnapshotDir, DefaultLogDBFile)
+	DefaultStableDBPath = filepath.Join(DefaultSnapshotDir, DefaultStableDBFile)
 )
 
 type PlacerConfig struct {
@@ -59,8 +56,8 @@ type PlacerConfig struct {
 
 func DefaultPlacerConfig() *PlacerConfig {
 	return &PlacerConfig{
-		Host:           DefaultPlacerHost,
-		ID:             DefaultPlacerID,
+		Host:           api.DefaultPlacerHost,
+		ID:             api.DefaultPlacerID,
 		Peers:          DefaultPlacerPeers,
 		SnapshotDir:    DefaultSnapshotDir,
 		SnapshotRetain: DefaultSnapshotRetain,
@@ -88,9 +85,9 @@ func Placer() api.Server                   { return NewPlacer(DefaultPlacerConfi
 func (*placerServer) Name() string { return "placer" }
 
 func (s *placerServer) DefineFlags(f *flag.FlagSet) {
-	f.StringVar(&s.config.Host, "host", DefaultPlacerHost, "listen host")
-	f.StringVar((*string)(&s.config.ID), "id", DefaultPlacerID, "placer ID")
-	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerPeersURL, "placer peers URL")
+	f.StringVar(&s.config.Host, "host", api.DefaultPlacerHost, "listen host")
+	f.StringVar((*string)(&s.config.ID), "id", api.DefaultPlacerID, "placer ID")
+	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerPeers.String(), "placer peers URL")
 	f.StringVar(&s.config.SnapshotDir, "snap-dir", DefaultSnapshotDir, "Raft snapshot base directory")
 	f.IntVar(&s.config.SnapshotRetain, "snap-retain", DefaultSnapshotRetain, "Raft snapshots to retain")
 	f.StringVar(&s.config.LogDBPath, "logdb", DefaultLogDBPath, "Raft log store path")
@@ -234,7 +231,7 @@ func (s *placerServer) GetMembers() api.Peers { return s.config.Peers }
 
 func (s *placerServer) AskLeader(api.Peer) (*api.PeerInfo, error) {
 	leader, id := s.rn.LeaderWithID()
-	return &api.PeerInfo{ID: id, Peer: peers.TCPVoter(leader)}, nil
+	return &api.PeerInfo{ID: id, Peer: peers.Voter(leader)}, nil
 }
 
 func (s *placerServer) LookupMetaService(key api.MetaKey) (api.MetaService, error) {

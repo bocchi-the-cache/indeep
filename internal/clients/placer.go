@@ -2,6 +2,7 @@ package clients
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/hashicorp/raft"
 
@@ -11,14 +12,12 @@ import (
 )
 
 type PlacerConfig struct {
-	Peers api.Peers
-
-	httpClient *http.Client
+	Peers         api.Peers
+	ClientTimeout time.Duration
 }
 
 type placerClient struct {
-	h *http.Client
-
+	client   *http.Client
 	members  api.Peers
 	leaderID raft.ServerID
 	leader   api.Peer
@@ -26,7 +25,7 @@ type placerClient struct {
 
 func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	cl := &placerClient{
-		h:       c.httpClient,
+		client:  &http.Client{Timeout: c.ClientTimeout},
 		members: c.Peers,
 	}
 	info, err := api.AskLeader(cl)
@@ -41,10 +40,11 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 func (c *placerClient) GetMembers() api.Peers { return c.members }
 
 func (c *placerClient) AskLeader(e api.Peer) (*api.PeerInfo, error) {
-	resp, err := c.h.Get(e.RPC(api.RpcAskLeader).String())
+	resp, err := c.client.Get(e.RPC(api.RpcAskLeader).String())
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = resp.Body.Close() }()
 
 	info := &api.PeerInfo{Peer: peers.DefaultPeer()}
 	if err := jsonhttp.Unmarshal(resp.Body, info); err != nil {

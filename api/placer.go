@@ -1,6 +1,12 @@
 package api
 
+import "github.com/hashicorp/raft"
+
 const (
+	DefaultPlacerID                      = "placer0"
+	DefaultPlacerHost                    = "127.0.0.1:11551"
+	DefaultPlacerPeer raft.ServerAddress = "127.0.0.1:11561"
+
 	RpcGetMembers        RpcID = "get-members"
 	RpcAskLeader         RpcID = "ask-leader"
 	RpcLookupMetaService RpcID = "lookup-meta-service"

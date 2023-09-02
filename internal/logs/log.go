@@ -2,22 +2,34 @@ package logs
 
 import (
 	"log"
+	"log/slog"
 	"os"
 
 	"github.com/hashicorp/go-hclog"
 )
 
-func newLogger(prefix string) *log.Logger {
-	return log.New(os.Stderr, prefix, log.LstdFlags|log.Lshortfile|log.Lmicroseconds|log.Lmsgprefix)
+const coreFlags = log.LstdFlags | log.Lmicroseconds | log.Lmsgprefix
+
+func newCore(prefix string) *log.Logger {
+	return log.New(os.Stderr, prefix, coreFlags)
 }
 
 var (
-	I = newLogger("INF ")
-	E = newLogger("ERR ")
+	E = Logger("ERR ")
+	S = SLogger()
 
-	lib = newLogger("LIB ")
+	slogCore = newCore("SLOG ")
+	hcCore   = newCore("HC ")
 )
 
+func Logger(prefix string) *log.Logger {
+	return log.New(os.Stderr, prefix, coreFlags|log.Lshortfile)
+}
+
+func SLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(slogCore.Writer(), &slog.HandlerOptions{AddSource: true}))
+}
+
 func HcLogger(name string) hclog.Logger {
-	return hclog.FromStandardLogger(lib, &hclog.LoggerOptions{Name: name})
+	return hclog.FromStandardLogger(hcCore, &hclog.LoggerOptions{Name: name, IncludeLocation: true})
 }
