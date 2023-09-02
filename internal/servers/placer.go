@@ -15,9 +15,9 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
+	"github.com/bocchi-the-cache/indeep/internal/typedh"
 )
 
 const (
@@ -159,12 +159,8 @@ func (s *placerServer) Setup() error {
 		Addr: s.config.Host,
 		Handler: peers.
 			Mux(p).
-			HandleFunc(api.RpcGetMembers, s.HandleGetMembers).
-			HandleFunc(api.RpcAskLeader, s.HandleAskLeader).
-			HandleFunc(api.RpcLookupMetaService, s.HandleLookupMetaService).
-			HandleFunc(api.RpcAddMetaService, s.HandleAddMetaService).
-			HandleFunc(api.RpcLookupDataService, s.HandleLookupDataService).
-			HandleFunc(api.RpcAddDataService, s.HandleAddDataService).
+			HandleFunc(api.RpcGetMembers, typedh.Provider(s.HandleGetMembers)).
+			HandleFunc(api.RpcAskLeader, typedh.Provider(s.HandleAskLeader)).
 			Build(),
 		ErrorLog: logs.E,
 	}
@@ -177,39 +173,13 @@ func (s *placerServer) Shutdown(ctx context.Context) error {
 	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
 }
 
-func (s *placerServer) HandleGetMembers(w jsonhttp.ResponseWriter, r *http.Request) {
-	_ = r.Body.Close()
-	w.OK(s.GetMembers().Configuration())
+func (s *placerServer) HandleGetMembers() (*raft.Configuration, error) {
+	conf := s.GetMembers().Configuration()
+	return &conf, nil
 }
 
-func (s *placerServer) HandleAskLeader(w jsonhttp.ResponseWriter, r *http.Request) {
-	_ = r.Body.Close()
-	info, err := s.AskLeader(nil)
-	if err != nil {
-		w.Err(err)
-		return
-	}
-	w.OK(info)
-}
-
-func (s *placerServer) HandleLookupMetaService(w jsonhttp.ResponseWriter, r *http.Request) {
-	// TODO
-	_, _ = s.LookupMetaService(nil)
-}
-
-func (s *placerServer) HandleAddMetaService(w jsonhttp.ResponseWriter, r *http.Request) {
-	// TODO
-	_ = s.AddMetaService()
-}
-
-func (s *placerServer) HandleLookupDataService(w jsonhttp.ResponseWriter, r *http.Request) {
-	// TODO
-	_, _ = s.LookupDataService(nil)
-}
-
-func (s *placerServer) HandleAddDataService(w jsonhttp.ResponseWriter, r *http.Request) {
-	// TODO
-	_ = s.AddDataService()
+func (s *placerServer) HandleAskLeader() (*api.PeerInfo, error) {
+	return s.AskLeader(nil)
 }
 
 func (s *placerServer) Apply(log *raft.Log) interface{} {

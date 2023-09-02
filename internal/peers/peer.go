@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/raft"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/jsonhttp"
 )
 
 const (
@@ -207,7 +206,7 @@ func (p *peer) UnmarshalJSON(bytes []byte) error {
 
 type (
 	PeerMux interface {
-		HandleFunc(rpc api.RpcID, f func(w jsonhttp.ResponseWriter, r *http.Request)) PeerMux
+		HandleFunc(rpc api.RpcID, f http.HandlerFunc) PeerMux
 		Build() *http.ServeMux
 	}
 
@@ -219,8 +218,8 @@ type (
 
 func Mux(p api.Peer) PeerMux { return &peerMux{p: p, m: http.NewServeMux()} }
 
-func (s *peerMux) HandleFunc(rpc api.RpcID, f func(w jsonhttp.ResponseWriter, r *http.Request)) PeerMux {
-	s.m.HandleFunc(s.p.RPC(rpc).Path, func(w http.ResponseWriter, r *http.Request) { f(jsonhttp.W(w), r) })
+func (s *peerMux) HandleFunc(rpc api.RpcID, f http.HandlerFunc) PeerMux {
+	s.m.HandleFunc(s.p.RPC(rpc).Path, f)
 	return s
 }
 
