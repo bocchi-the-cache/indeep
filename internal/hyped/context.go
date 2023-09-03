@@ -24,17 +24,13 @@ func NewContext(c Codec, w http.ResponseWriter, r *http.Request) Context {
 	return &context{c: c, w: w, r: r}
 }
 
-func UnmarshalWith(c Codec, body io.ReadCloser, v any) error {
+func unmarshalBody(c Codec, body io.ReadCloser, v any) error {
 	defer func() { _ = body.Close() }()
 	data, err := io.ReadAll(body)
 	if err != nil {
 		return err
 	}
 	return c.Unmarshal(data, v)
-}
-
-func Unmarshal(body io.ReadCloser, v any) error {
-	return UnmarshalWith(DefaultCodec, body, v)
 }
 
 func (c *context) OK(v any) {

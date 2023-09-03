@@ -17,7 +17,8 @@ type PlacerConfig struct {
 }
 
 type placerClient struct {
-	client   *http.Client
+	config   *PlacerConfig
+	rpc      hyped.RPC
 	members  api.Peers
 	leaderID raft.ServerID
 	leader   api.Peer
@@ -25,7 +26,8 @@ type placerClient struct {
 
 func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	cl := &placerClient{
-		client:  &http.Client{Timeout: c.ClientTimeout},
+		config:  c,
+		rpc:     hyped.NewRPC(&http.Client{Timeout: c.ClientTimeout}),
 		members: c.Peers,
 	}
 	info, err := api.AskLeader(cl)
@@ -39,18 +41,11 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 
 func (c *placerClient) GetMembers() api.Peers { return c.members }
 
-func (c *placerClient) AskLeader(e api.Peer) (*api.PeerInfo, error) {
-	resp, err := c.client.Get(e.RPC(api.RpcAskLeader).String())
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
+func (c *placerClient) AskLeader(p api.Peer) (*api.PeerInfo, error) {
 	info := &api.PeerInfo{Peer: peers.DefaultPeer()}
-	if err := hyped.Unmarshal(resp.Body, info); err != nil {
+	if err := c.rpc.Get(p, api.RpcAskLeader, info); err != nil {
 		return nil, err
 	}
-
 	return info, nil
 }
 

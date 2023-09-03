@@ -12,7 +12,7 @@ func ConsumerWith[Req any](c Codec, f ConsumerFunc[Req]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := NewContext(c, w, r)
 		var req Req
-		if err := UnmarshalWith(c, r.Body, &req); err != nil {
+		if err := unmarshalBody(c, r.Body, &req); err != nil {
 			ctx.Err(err)
 			return
 		}
@@ -39,7 +39,7 @@ func ProcessorWith[Req, Resp any](c Codec, f ProcessorFunc[Req, Resp]) http.Hand
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req Req
 		ctx := NewContext(c, w, r)
-		if err := UnmarshalWith(c, r.Body, &req); err != nil {
+		if err := unmarshalBody(c, r.Body, &req); err != nil {
 			ctx.Err(err)
 			return
 		}
