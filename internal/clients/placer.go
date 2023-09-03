@@ -7,8 +7,8 @@ import (
 	"github.com/hashicorp/raft"
 
 	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
-	"github.com/bocchi-the-cache/indeep/internal/typedh"
 )
 
 type PlacerConfig struct {
@@ -47,7 +47,7 @@ func (c *placerClient) AskLeader(e api.Peer) (*api.PeerInfo, error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	info := &api.PeerInfo{Peer: peers.DefaultPeer()}
-	if err := typedh.Unmarshal(resp.Body, info); err != nil {
+	if err := hyped.Unmarshal(resp.Body, info); err != nil {
 		return nil, err
 	}
 

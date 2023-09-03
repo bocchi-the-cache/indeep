@@ -15,9 +15,9 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 
 	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
-	"github.com/bocchi-the-cache/indeep/internal/typedh"
 )
 
 const (
@@ -159,8 +159,8 @@ func (s *placerServer) Setup() error {
 		Addr: s.config.Host,
 		Handler: peers.
 			Mux(p).
-			HandleFunc(api.RpcGetMembers, typedh.Provider(s.HandleGetMembers)).
-			HandleFunc(api.RpcAskLeader, typedh.Provider(s.HandleAskLeader)).
+			HandleFunc(api.RpcGetMembers, hyped.Provider(s.HandleGetMembers)).
+			HandleFunc(api.RpcAskLeader, hyped.Provider(s.HandleAskLeader)).
 			Build(),
 		ErrorLog: logs.E,
 	}

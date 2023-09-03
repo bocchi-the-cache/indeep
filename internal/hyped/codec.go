@@ -1,4 +1,4 @@
-package typedh
+package hyped
 
 import "encoding/json"
 
