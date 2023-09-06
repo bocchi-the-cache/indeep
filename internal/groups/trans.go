@@ -19,6 +19,7 @@ type (
 )
 
 type StreamLayerMux interface {
+	io.Closer
 	NetworkLayer(groupID GroupID) raft.StreamLayer
 }
 
@@ -89,6 +90,15 @@ func (m *streamLayerMux) newAcceptor(groupID GroupID) chan net.Conn {
 	ch := make(chan net.Conn, 1)
 	m.groups[groupID] = ch
 	return ch
+}
+
+func (m *streamLayerMux) Close() error {
+	m.groupsMu.Lock()
+	defer m.groupsMu.Unlock()
+	for _, ch := range m.groups {
+		close(ch)
+	}
+	return m.listener.Close()
 }
 
 type streamLayer struct {
