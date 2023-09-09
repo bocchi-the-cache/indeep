@@ -8,29 +8,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bocchi-the-cache/indeep/internal/logs"
-
 	"github.com/hashicorp/raft"
-)
 
-type (
-	NodeAddress string
-	GroupID     string
+	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/logs"
 )
-
-type StreamLayerMux interface {
-	io.Closer
-	NetworkLayer(groupID GroupID) raft.StreamLayer
-}
 
 type streamLayerMux struct {
-	localAddr NodeAddress
+	localAddr api.NodeAddress
 	listener  *net.TCPListener
-	groups    map[GroupID]chan net.Conn
+	groups    map[api.GroupID]chan net.Conn
 	groupsMu  sync.RWMutex
 }
 
-func NewStreamLayerMux(localAddr NodeAddress) (StreamLayerMux, error) {
+func NewStreamLayerMux(localAddr api.NodeAddress) (api.StreamLayerMux, error) {
 	l, err := net.Listen("tcp", string(localAddr))
 	if err != nil {
 		return nil, err
@@ -38,7 +29,7 @@ func NewStreamLayerMux(localAddr NodeAddress) (StreamLayerMux, error) {
 	m := &streamLayerMux{
 		localAddr: localAddr,
 		listener:  l.(*net.TCPListener),
-		groups:    make(map[GroupID]chan net.Conn),
+		groups:    make(map[api.GroupID]chan net.Conn),
 	}
 	go m.acceptMux()
 	return m, nil
@@ -65,14 +56,14 @@ func (m *streamLayerMux) acceptMux() {
 	}
 }
 
-func (m *streamLayerMux) getAcceptor(groupID GroupID) (chan net.Conn, bool) {
+func (m *streamLayerMux) getAcceptor(groupID api.GroupID) (chan net.Conn, bool) {
 	m.groupsMu.RLock()
 	defer m.groupsMu.RUnlock()
 	ch, ok := m.groups[groupID]
 	return ch, ok
 }
 
-func (m *streamLayerMux) NetworkLayer(groupID GroupID) raft.StreamLayer {
+func (m *streamLayerMux) NetworkLayer(groupID api.GroupID) raft.StreamLayer {
 	return &streamLayer{
 		localAddr: m.localAddr,
 		groupID:   groupID,
@@ -81,7 +72,7 @@ func (m *streamLayerMux) NetworkLayer(groupID GroupID) raft.StreamLayer {
 	}
 }
 
-func (m *streamLayerMux) newAcceptor(groupID GroupID) chan net.Conn {
+func (m *streamLayerMux) newAcceptor(groupID api.GroupID) chan net.Conn {
 	m.groupsMu.Lock()
 	defer m.groupsMu.Unlock()
 	if ch, ok := m.groups[groupID]; ok {
@@ -102,13 +93,13 @@ func (m *streamLayerMux) Close() error {
 }
 
 type streamLayer struct {
-	localAddr NodeAddress
-	groupID   GroupID
+	localAddr api.NodeAddress
+	groupID   api.GroupID
 	mux       *streamLayerMux
 	acceptor  <-chan net.Conn
 }
 
-func readDialHeader(r io.Reader) (GroupID, error) {
+func readDialHeader(r io.Reader) (api.GroupID, error) {
 	lenBuf := make([]byte, 1)
 	if _, err := r.Read(lenBuf); err != nil {
 		return "", err
@@ -121,10 +112,10 @@ func readDialHeader(r io.Reader) (GroupID, error) {
 	if _, err := r.Read(groupID); err != nil {
 		return "", err
 	}
-	return GroupID(groupID), nil
+	return api.GroupID(groupID), nil
 }
 
-func writeDialHeader(w io.Writer, groupID GroupID) error {
+func writeDialHeader(w io.Writer, groupID api.GroupID) error {
 	_, err := w.Write(append([]byte{byte(len(groupID))}, []byte(groupID)...))
 	return err
 }

@@ -6,12 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
+
+	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/logs"
 )
 
-func newStreamLayerMux(t *testing.T, local NodeAddress) StreamLayerMux {
+func newStreamLayerMux(t *testing.T, local api.NodeAddress) api.StreamLayerMux {
 	m, err := NewStreamLayerMux(local)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +53,7 @@ func bootstrapNode(t *testing.T, s raft.StreamLayer, c raft.Configuration, id ra
 	go func() {
 		time.Sleep(10 * time.Second)
 		leader, leaderID := r.LeaderWithID()
-		logs.S.Info("OHHHHHHHHHHHHHHH", "leader", leader, "leaderID", leaderID, "c", r.GetConfiguration().Configuration())
+		logs.S.Info("Raft group info", "leader", leader, "leaderID", leaderID, "c", r.GetConfiguration().Configuration())
 	}()
 }
 
