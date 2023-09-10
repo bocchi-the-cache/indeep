@@ -29,9 +29,12 @@ func DefaultMetaserverConfig() *MetaserverConfig {
 }
 
 type metaserver struct {
-	config   *MetaserverConfig
-	server   *http.Server
+	config *MetaserverConfig
+	server *http.Server
+
 	placerCl api.Placer
+
+	mux api.StreamLayerMux
 }
 
 func NewMetaserver(c *MetaserverConfig) api.Server { return &metaserver{config: c} }
@@ -73,3 +76,8 @@ func (m *metaserver) Setup() error {
 
 func (m *metaserver) ListenAndServe() error              { return m.server.ListenAndServe() }
 func (m *metaserver) Shutdown(ctx context.Context) error { return m.server.Shutdown(ctx) }
+
+func (m *metaserver) Lookup(key api.MetaKey) (api.MetaPartition, error) {
+	//TODO implement me
+	panic("implement me")
+}

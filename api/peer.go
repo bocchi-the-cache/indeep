@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 
 	"github.com/hashicorp/raft"
 )
@@ -26,15 +25,8 @@ type Peers interface {
 }
 
 type Peer interface {
-	fmt.Stringer
-
-	URL() *url.URL
-	RPC(id RpcID) *url.URL
-
+	Instance
 	Suffrage() raft.ServerSuffrage
-
-	json.Marshaler
-	json.Unmarshaler
 }
 
 type PeerInfo struct {

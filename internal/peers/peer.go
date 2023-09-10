@@ -13,13 +13,7 @@ import (
 	"github.com/bocchi-the-cache/indeep/api"
 )
 
-const (
-	HostScheme = "http"
-	RaftScheme = "tcp"
-
-	RootPath = "/"
-	mapSep   = ","
-)
+const mapSep = ","
 
 var (
 	ErrEmptyHosts    = errors.New("empty hosts")
@@ -32,8 +26,8 @@ type peers struct {
 	m      map[raft.ServerID]api.Peer
 }
 
-func RaftPeers() api.Peers { return NewPeers(RaftScheme) }
-func HostPeers() api.Peers { return NewPeers(HostScheme) }
+func RaftPeers() api.Peers { return NewPeers(api.RaftScheme) }
+func HostPeers() api.Peers { return NewPeers(api.HostScheme) }
 
 func NewPeers(scheme string) api.Peers {
 	return &peers{scheme: scheme, m: make(map[raft.ServerID]api.Peer)}
@@ -58,7 +52,7 @@ func parsePeers(rawURL string) (string, map[raft.ServerID]api.Peer, error) {
 	}
 	hosts := strings.Split(u.Host, mapSep)
 
-	rawPath := strings.TrimLeft(u.Path, RootPath)
+	rawPath := strings.TrimLeft(u.Path, api.RootPath)
 	if rawPath == "" {
 		return "", nil, ErrEmptyIDs
 	}
@@ -71,7 +65,7 @@ func parsePeers(rawURL string) (string, map[raft.ServerID]api.Peer, error) {
 	m := make(map[raft.ServerID]api.Peer)
 	for i, host := range hosts {
 		id := raft.ServerID(ids[i])
-		m[id] = &peer{u: &url.URL{Scheme: u.Scheme, Host: host}}
+		m[id] = &peer{Instance: api.NewURLInstance(u.Scheme, host)}
 	}
 
 	return u.Scheme, m, nil
@@ -89,7 +83,7 @@ func (p *peers) String() string {
 	u := &url.URL{
 		Scheme: p.scheme,
 		Host:   strings.Join(hosts, mapSep),
-		Path:   RootPath + strings.Join(ids, mapSep),
+		Path:   api.RootPath + strings.Join(ids, mapSep),
 	}
 	return u.String()
 }
@@ -148,7 +142,7 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 	}
 	hosts := strings.Split(u.Host, mapSep)
 
-	rawPath := strings.TrimLeft(u.Path, RootPath)
+	rawPath := strings.TrimLeft(u.Path, api.RootPath)
 	if rawPath == "" {
 		return ErrEmptyIDs
 	}
@@ -161,7 +155,7 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 	m := make(map[raft.ServerID]api.Peer)
 	for i, host := range hosts {
 		id := raft.ServerID(ids[i])
-		m[id] = &peer{u: &url.URL{Scheme: p.scheme, Host: host}}
+		m[id] = &peer{Instance: api.NewURLInstance(p.scheme, host)}
 	}
 	p.m = m
 
@@ -169,40 +163,17 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 }
 
 type peer struct {
-	u *url.URL
+	api.Instance
 	s raft.ServerSuffrage
 }
 
 func DefaultPeer() api.Peer { return new(peer) }
 
 func Voter(addr raft.ServerAddress) api.Peer {
-	return &peer{u: &url.URL{Scheme: RaftScheme, Host: string(addr)}}
-}
-
-var parsePeer = url.Parse
-
-func (p *peer) String() string { return p.u.String() }
-func (p *peer) URL() *url.URL  { return p.u }
-func (p *peer) RPC(id api.RpcID) *url.URL {
-	return &url.URL{Scheme: p.u.Scheme, Host: p.u.Host, Path: RootPath + string(id)}
+	return &peer{Instance: api.NewURLInstance(api.RaftScheme, string(addr))}
 }
 
 func (p *peer) Suffrage() raft.ServerSuffrage { return p.s }
-
-func (p *peer) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
-
-func (p *peer) UnmarshalJSON(bytes []byte) error {
-	var rawURL string
-	if err := json.Unmarshal(bytes, &rawURL); err != nil {
-		return err
-	}
-	u, err := parsePeer(rawURL)
-	if err != nil {
-		return err
-	}
-	p.u = u
-	return nil
-}
 
 type (
 	PeerMux interface {

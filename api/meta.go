@@ -1,7 +1,8 @@
 package api
 
 const (
-	DefaultMetaserverHost = "127.0.0.1:11651"
+	DefaultMetaserverHost      = "127.0.0.1:11651"
+	DefaultMetaServerMultiPeer = "127.0.0.1:11661"
 )
 
 type MetaKey interface {
@@ -11,6 +12,8 @@ type MetaKey interface {
 }
 
 type MetaPartition interface {
+	Peer
+
 	StartKey() string
 	EndKey() string
 	KeyCount() int
