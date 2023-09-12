@@ -9,12 +9,12 @@ import (
 )
 
 type (
-	NodeAddress string
-	GroupID     string
+	NodeHost string
+	GroupID  string
 )
 
 type Multipeer interface {
-	Instance
+	Addresser
 }
 
 type Multipeers interface {

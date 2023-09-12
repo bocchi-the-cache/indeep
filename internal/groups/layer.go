@@ -15,13 +15,13 @@ import (
 )
 
 type streamLayerMux struct {
-	localAddr api.NodeAddress
+	localAddr api.NodeHost
 	listener  *net.TCPListener
 	groups    map[api.GroupID]chan net.Conn
 	groupsMu  sync.RWMutex
 }
 
-func NewStreamLayerMux(localAddr api.NodeAddress) (api.StreamLayerMux, error) {
+func NewStreamLayerMux(localAddr api.NodeHost) (api.StreamLayerMux, error) {
 	l, err := net.Listen("tcp", string(localAddr))
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (m *streamLayerMux) Close() error {
 }
 
 type streamLayer struct {
-	localAddr api.NodeAddress
+	localAddr api.NodeHost
 	groupID   api.GroupID
 	mux       *streamLayerMux
 	acceptor  <-chan net.Conn

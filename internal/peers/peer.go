@@ -65,7 +65,7 @@ func parsePeers(rawURL string) (string, map[raft.ServerID]api.Peer, error) {
 	m := make(map[raft.ServerID]api.Peer)
 	for i, host := range hosts {
 		id := raft.ServerID(ids[i])
-		m[id] = &peer{Instance: api.NewURLInstance(u.Scheme, host)}
+		m[id] = &peer{addr: api.NewAddress(u.Scheme, host)}
 	}
 
 	return u.Scheme, m, nil
@@ -78,7 +78,7 @@ func (p *peers) String() string {
 	)
 	for id, e := range p.m {
 		ids = append(ids, string(id))
-		hosts = append(hosts, e.URL().Host)
+		hosts = append(hosts, e.Address().Host)
 	}
 	u := &url.URL{
 		Scheme: p.scheme,
@@ -107,7 +107,7 @@ func (p *peers) Configuration() (c raft.Configuration) {
 		c.Servers = append(c.Servers, raft.Server{
 			Suffrage: peer.Suffrage(),
 			ID:       id,
-			Address:  raft.ServerAddress(peer.URL().Host),
+			Address:  raft.ServerAddress(peer.Address().Host),
 		})
 	}
 	return
@@ -155,7 +155,7 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 	m := make(map[raft.ServerID]api.Peer)
 	for i, host := range hosts {
 		id := raft.ServerID(ids[i])
-		m[id] = &peer{Instance: api.NewURLInstance(p.scheme, host)}
+		m[id] = &peer{addr: api.NewAddress(p.scheme, host)}
 	}
 	p.m = m
 
@@ -163,16 +163,17 @@ func (p *peers) UnmarshalJSON(bytes []byte) error {
 }
 
 type peer struct {
-	api.Instance
-	s raft.ServerSuffrage
+	addr *api.Address
+	s    raft.ServerSuffrage
 }
 
 func DefaultPeer() api.Peer { return new(peer) }
 
 func Voter(addr raft.ServerAddress) api.Peer {
-	return &peer{Instance: api.NewURLInstance(api.RaftScheme, string(addr))}
+	return &peer{addr: api.NewAddress(api.RaftScheme, string(addr))}
 }
 
+func (p *peer) Address() *api.Address         { return p.addr }
 func (p *peer) Suffrage() raft.ServerSuffrage { return p.s }
 
 type (
@@ -190,7 +191,7 @@ type (
 func Mux(p api.Peer) PeerMux { return &peerMux{p: p, m: http.NewServeMux()} }
 
 func (s *peerMux) HandleFunc(rpc api.RpcID, f http.HandlerFunc) PeerMux {
-	s.m.HandleFunc(s.p.RPC(rpc).Path, f)
+	s.m.HandleFunc(s.p.Address().RPC(rpc).Path, f)
 	return s
 }
 

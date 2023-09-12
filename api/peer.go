@@ -7,8 +7,6 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-type RpcID string
-
 type Peers interface {
 	fmt.Stringer
 
@@ -25,7 +23,7 @@ type Peers interface {
 }
 
 type Peer interface {
-	Instance
+	Addresser
 	Suffrage() raft.ServerSuffrage
 }
 

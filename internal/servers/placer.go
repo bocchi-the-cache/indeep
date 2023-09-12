@@ -124,7 +124,7 @@ func (s *placerServer) Setup() error {
 	}
 
 	trans, err := raft.NewTCPTransportWithLogger(
-		p.URL().Host,
+		p.Address().Host,
 		nil,
 		s.config.PeersConnPool,
 		s.config.PeersIOTimeout,

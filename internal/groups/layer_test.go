@@ -13,7 +13,7 @@ import (
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 )
 
-func newStreamLayerMux(t *testing.T, local api.NodeAddress) api.StreamLayerMux {
+func newStreamLayerMux(t *testing.T, local api.NodeHost) api.StreamLayerMux {
 	m, err := NewStreamLayerMux(local)
 	if err != nil {
 		t.Fatal(err)
