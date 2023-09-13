@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/hashicorp/raft"
 )
 
 const (
@@ -16,7 +18,9 @@ const (
 )
 
 var (
-	ErrAddressListEmptyHosts = errors.New("empty hosts in address list")
+	ErrAddressEmptyHosts     = errors.New("empty hosts in address")
+	ErrAddressEmptyServerIDs = errors.New("empty server IDs in address")
+	ErrAddressMapMismatched  = errors.New("map mismatched in address")
 )
 
 type RpcID string
@@ -93,10 +97,86 @@ func parseAddressList(rawURL string) (scheme string, hosts []string, err error) 
 		return
 	}
 	if u.Host == "" {
-		err = ErrAddressListEmptyHosts
+		err = ErrAddressEmptyHosts
 		return
 	}
 	scheme = u.Scheme
 	hosts = strings.Split(u.Host, HostSep)
 	return
+}
+
+type AddressMap struct {
+	scheme string
+	hosts  map[raft.ServerID]string
+}
+
+func parseAddressMap(rawURL string) (scheme string, hosts map[raft.ServerID]string, err error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return
+	}
+
+	if u.Host == "" {
+		err = ErrAddressEmptyHosts
+		return
+	}
+	hostList := strings.Split(u.Host, HostSep)
+
+	rawPath := strings.TrimLeft(u.Path, RootPath)
+	if rawPath == "" {
+		err = ErrAddressEmptyServerIDs
+		return
+	}
+	ids := strings.Split(rawPath, HostSep)
+
+	if len(hostList) != len(ids) {
+		err = fmt.Errorf("%w: hostList=%v, ids=%v", ErrAddressMapMismatched, hostList, ids)
+		return
+	}
+
+	scheme = u.Scheme
+	hosts = make(map[raft.ServerID]string)
+	for i, host := range hostList {
+		id := raft.ServerID(ids[i])
+		hosts[id] = host
+	}
+
+	return
+}
+
+func (p *AddressMap) String() string {
+	var (
+		ids   []string
+		hosts []string
+	)
+	for id, host := range p.hosts {
+		ids = append(ids, string(id))
+		hosts = append(hosts, host)
+	}
+	u := &url.URL{
+		Scheme: p.scheme,
+		Host:   strings.Join(hosts, HostSep),
+		Path:   RootPath + strings.Join(ids, HostSep),
+	}
+	return u.String()
+}
+
+func (p *AddressMap) Lookup(id raft.ServerID) string { return p.hosts[id] }
+
+func (p *AddressMap) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
+
+func (p *AddressMap) UnmarshalJSON(bytes []byte) error {
+	var rawURL string
+	if err := json.Unmarshal(bytes, &rawURL); err != nil {
+		return err
+	}
+
+	scheme, hosts, err := parseAddressMap(rawURL)
+	if err != nil {
+		return err
+	}
+
+	p.scheme = scheme
+	p.hosts = hosts
+	return nil
 }
