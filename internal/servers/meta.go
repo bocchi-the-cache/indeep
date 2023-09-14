@@ -22,7 +22,7 @@ func DefaultMetaserverConfig() *MetaserverConfig {
 	return &MetaserverConfig{
 		Host: api.DefaultMetaserverHost,
 		Placer: clients.PlacerConfig{
-			Peers:         DefaultPlacerPeers,
+			PeerMap:       DefaultPlacerPeerMap,
 			ClientTimeout: DefaultPeersIOTimeout,
 		},
 	}
@@ -30,6 +30,7 @@ func DefaultMetaserverConfig() *MetaserverConfig {
 
 type metaserver struct {
 	config *MetaserverConfig
+	peers  api.Peers
 	server *http.Server
 
 	placerCl api.Placer
@@ -44,17 +45,18 @@ func (*metaserver) Name() string { return "metaserver" }
 
 func (m *metaserver) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&m.config.Host, "host", api.DefaultMetaserverHost, "listen host")
-	f.StringVar(&m.config.rawPlacerPeers, "placer-hosts", DefaultPlacerHosts.String(), "placer hosts URL")
+	f.StringVar(&m.config.rawPlacerPeers, "placer-hosts", DefaultPlacerHostMap.String(), "placer hosts URL")
 }
 
 func (m *metaserver) Setup() error {
 	if m.config.rawPlacerPeers != "" {
-		ps, err := peers.ParsePeers(m.config.rawPlacerPeers)
+		ps, err := api.ParseAddressMap(m.config.rawPlacerPeers)
 		if err != nil {
 			return err
 		}
-		m.config.Placer.Peers = ps
+		m.config.Placer.PeerMap = ps
 	}
+	m.peers = peers.NewPeers(m.config.Placer.PeerMap)
 
 	placerCl, err := clients.NewPlacer(&m.config.Placer)
 	if err != nil {

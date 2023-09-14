@@ -4,8 +4,8 @@ import "net/http"
 
 type (
 	ConsumerFunc[Req any]        func(r *Req) error
-	ProviderFunc[Resp any]       func() (*Resp, error)
-	ProcessorFunc[Req, Resp any] func(r *Req) (*Resp, error)
+	ProviderFunc[Resp any]       func() (Resp, error)
+	ProcessorFunc[Req, Resp any] func(r *Req) (Resp, error)
 )
 
 func ConsumerWith[Req any](c Codec, f ConsumerFunc[Req]) http.HandlerFunc {

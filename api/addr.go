@@ -62,7 +62,7 @@ func (a *Address) UnmarshalJSON(bytes []byte) error {
 
 type AddressList struct {
 	scheme string
-	hosts  []string
+	hosts  []raft.ServerAddress
 }
 
 var (
@@ -71,13 +71,17 @@ var (
 	_ = (json.Unmarshaler)((*AddressList)(nil))
 )
 
-func (a *AddressList) String() string {
-	return (&url.URL{Scheme: a.scheme, Host: strings.Join(a.hosts, HostSep)}).String()
+func (l *AddressList) String() string {
+	var rawHosts []string
+	for _, host := range l.hosts {
+		rawHosts = append(rawHosts, string(host))
+	}
+	return (&url.URL{Scheme: l.scheme, Host: strings.Join(rawHosts, HostSep)}).String()
 }
 
-func (a *AddressList) MarshalJSON() ([]byte, error) { return json.Marshal(a.String()) }
+func (l *AddressList) MarshalJSON() ([]byte, error) { return json.Marshal(l.String()) }
 
-func (a *AddressList) UnmarshalJSON(bytes []byte) error {
+func (l *AddressList) UnmarshalJSON(bytes []byte) error {
 	var rawURL string
 	if err := json.Unmarshal(bytes, &rawURL); err != nil {
 		return err
@@ -86,12 +90,12 @@ func (a *AddressList) UnmarshalJSON(bytes []byte) error {
 	if err != nil {
 		return err
 	}
-	a.scheme = scheme
-	a.hosts = hosts
+	l.scheme = scheme
+	l.hosts = hosts
 	return nil
 }
 
-func parseAddressList(rawURL string) (scheme string, hosts []string, err error) {
+func parseAddressList(rawURL string) (scheme string, hosts []raft.ServerAddress, err error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return
@@ -101,16 +105,43 @@ func parseAddressList(rawURL string) (scheme string, hosts []string, err error) 
 		return
 	}
 	scheme = u.Scheme
-	hosts = strings.Split(u.Host, HostSep)
+	for _, s := range strings.Split(u.Host, HostSep) {
+		hosts = append(hosts, raft.ServerAddress(s))
+	}
 	return
 }
 
 type AddressMap struct {
 	scheme string
-	hosts  map[raft.ServerID]string
+	hosts  map[raft.ServerID]raft.ServerAddress
 }
 
-func parseAddressMap(rawURL string) (scheme string, hosts map[raft.ServerID]string, err error) {
+func NewAddressMap(scheme string) *AddressMap {
+	return &AddressMap{scheme: scheme, hosts: make(map[raft.ServerID]raft.ServerAddress)}
+}
+
+func (m *AddressMap) Scheme() string { return m.scheme }
+
+func (m *AddressMap) Addresses() map[raft.ServerID]raft.ServerAddress {
+	return m.hosts
+}
+
+func (m *AddressMap) Join(id raft.ServerID, host string) *AddressMap {
+	if _, ok := m.hosts[id]; !ok {
+		m.hosts[id] = raft.ServerAddress(host)
+	}
+	return m
+}
+
+func ParseAddressMap(rawURL string) (*AddressMap, error) {
+	scheme, hosts, err := parseAddressMap(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	return &AddressMap{scheme, hosts}, nil
+}
+
+func parseAddressMap(rawURL string) (scheme string, hosts map[raft.ServerID]raft.ServerAddress, err error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return
@@ -135,37 +166,34 @@ func parseAddressMap(rawURL string) (scheme string, hosts map[raft.ServerID]stri
 	}
 
 	scheme = u.Scheme
-	hosts = make(map[raft.ServerID]string)
+	hosts = make(map[raft.ServerID]raft.ServerAddress)
 	for i, host := range hostList {
-		id := raft.ServerID(ids[i])
-		hosts[id] = host
+		hosts[raft.ServerID(ids[i])] = raft.ServerAddress(host)
 	}
 
 	return
 }
 
-func (p *AddressMap) String() string {
+func (m *AddressMap) String() string {
 	var (
 		ids   []string
 		hosts []string
 	)
-	for id, host := range p.hosts {
+	for id, host := range m.hosts {
 		ids = append(ids, string(id))
-		hosts = append(hosts, host)
+		hosts = append(hosts, string(host))
 	}
 	u := &url.URL{
-		Scheme: p.scheme,
+		Scheme: m.scheme,
 		Host:   strings.Join(hosts, HostSep),
 		Path:   RootPath + strings.Join(ids, HostSep),
 	}
 	return u.String()
 }
 
-func (p *AddressMap) Lookup(id raft.ServerID) string { return p.hosts[id] }
+func (m *AddressMap) MarshalJSON() ([]byte, error) { return json.Marshal(m.String()) }
 
-func (p *AddressMap) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
-
-func (p *AddressMap) UnmarshalJSON(bytes []byte) error {
+func (m *AddressMap) UnmarshalJSON(bytes []byte) error {
 	var rawURL string
 	if err := json.Unmarshal(bytes, &rawURL); err != nil {
 		return err
@@ -176,7 +204,7 @@ func (p *AddressMap) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	p.scheme = scheme
-	p.hosts = hosts
+	m.scheme = scheme
+	m.hosts = hosts
 	return nil
 }

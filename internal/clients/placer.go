@@ -4,49 +4,45 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/raft"
-
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
 type PlacerConfig struct {
-	Peers         api.Peers
+	PeerMap       *api.AddressMap
 	ClientTimeout time.Duration
 }
 
 type placerClient struct {
-	config   *PlacerConfig
-	rpc      hyped.RPC
-	members  api.Peers
-	leaderID raft.ServerID
-	leader   api.Peer
+	config  *PlacerConfig
+	rpc     hyped.RPC
+	members api.Peers
+	leader  api.Peer
 }
 
 func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	cl := &placerClient{
 		config:  c,
 		rpc:     hyped.NewRPC(&http.Client{Timeout: c.ClientTimeout}),
-		members: c.Peers,
+		members: peers.NewPeers(c.PeerMap),
 	}
-	info, err := api.AskLeader(cl)
+	leader, err := api.AskLeader(cl)
 	if err != nil {
 		return nil, err
 	}
-	cl.leaderID = info.ID
-	cl.leader = info.Peer
+	cl.leader = leader
 	return cl, nil
 }
 
 func (c *placerClient) GetMembers() api.Peers { return c.members }
 
-func (c *placerClient) AskLeader(p api.Peer) (*api.PeerInfo, error) {
-	info := &api.PeerInfo{Peer: peers.DefaultPeer()}
-	if err := c.rpc.Get(p, api.RpcAskLeader, info); err != nil {
+func (c *placerClient) AskLeader(p api.Peer) (api.Peer, error) {
+	leader := peers.DefaultPeer()
+	if err := c.rpc.Get(p, api.RpcAskLeader, leader); err != nil {
 		return nil, err
 	}
-	return info, nil
+	return leader, nil
 }
 
 func (c *placerClient) LookupMetaService(key api.MetaKey) (api.MetaService, error) {

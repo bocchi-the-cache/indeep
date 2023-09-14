@@ -10,10 +10,10 @@ var (
 
 type Member interface {
 	GetMembers() Peers
-	AskLeader(e Peer) (*PeerInfo, error)
+	AskLeader(e Peer) (Peer, error)
 }
 
-func AskLeader(m Member) (*PeerInfo, error) {
+func AskLeader(m Member) (Peer, error) {
 	for _, e := range m.GetMembers().Peers() {
 		return m.AskLeader(e)
 	}

@@ -33,16 +33,16 @@ const (
 var (
 	ErrPlacerUnknownID = errors.New("unknown placer ID")
 
-	DefaultPlacerPeers  = peers.RaftPeers().Join(api.DefaultPlacerID, peers.Voter(api.DefaultPlacerPeer))
-	DefaultPlacerHosts  = peers.HostPeers().Join(api.DefaultPlacerID, peers.Voter(api.DefaultPlacerHost))
-	DefaultLogDBPath    = filepath.Join(DefaultSnapshotDir, DefaultLogDBFile)
-	DefaultStableDBPath = filepath.Join(DefaultSnapshotDir, DefaultStableDBFile)
+	DefaultPlacerPeerMap = api.NewAddressMap(api.RaftScheme).Join(api.DefaultPlacerID, api.DefaultPlacerPeer)
+	DefaultPlacerHostMap = api.NewAddressMap(api.HostScheme).Join(api.DefaultPlacerID, api.DefaultPlacerHost)
+	DefaultLogDBPath     = filepath.Join(DefaultSnapshotDir, DefaultLogDBFile)
+	DefaultStableDBPath  = filepath.Join(DefaultSnapshotDir, DefaultStableDBFile)
 )
 
 type PlacerConfig struct {
 	Host           string
 	ID             raft.ServerID
-	Peers          api.Peers
+	PeerMap        *api.AddressMap
 	SnapshotDir    string
 	SnapshotRetain int
 	LogDBPath      string
@@ -58,7 +58,7 @@ func DefaultPlacerConfig() *PlacerConfig {
 	return &PlacerConfig{
 		Host:           api.DefaultPlacerHost,
 		ID:             api.DefaultPlacerID,
-		Peers:          DefaultPlacerPeers,
+		PeerMap:        DefaultPlacerPeerMap,
 		SnapshotDir:    DefaultSnapshotDir,
 		SnapshotRetain: DefaultSnapshotRetain,
 		LogDBPath:      DefaultLogDBPath,
@@ -75,6 +75,7 @@ func (c *PlacerConfig) hcLogger(name string) hclog.Logger {
 
 type placerServer struct {
 	config *PlacerConfig
+	peers  api.Peers
 	server *http.Server
 	rn     *raft.Raft
 }
@@ -86,8 +87,8 @@ func (*placerServer) Name() string { return "placer" }
 
 func (s *placerServer) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&s.config.Host, "host", api.DefaultPlacerHost, "listen host")
-	f.StringVar((*string)(&s.config.ID), "id", api.DefaultPlacerID, "placer ID")
-	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerPeers.String(), "placer peers URL")
+	f.StringVar((*string)(&s.config.ID), "id", string(api.DefaultPlacerID), "placer ID")
+	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerPeerMap.String(), "placer peers URL")
 	f.StringVar(&s.config.SnapshotDir, "snap-dir", DefaultSnapshotDir, "Raft snapshot base directory")
 	f.IntVar(&s.config.SnapshotRetain, "snap-retain", DefaultSnapshotRetain, "Raft snapshots to retain")
 	f.StringVar(&s.config.LogDBPath, "logdb", DefaultLogDBPath, "Raft log store path")
@@ -98,16 +99,17 @@ func (s *placerServer) DefineFlags(f *flag.FlagSet) {
 
 func (s *placerServer) Setup() error {
 	if s.config.rawPeers != "" {
-		ps, err := peers.ParsePeers(s.config.rawPeers)
+		ps, err := api.ParseAddressMap(s.config.rawPeers)
 		if err != nil {
 			return err
 		}
-		s.config.Peers = ps
+		s.config.PeerMap = ps
 	}
+	s.peers = peers.NewPeers(s.config.PeerMap)
 
-	p := s.config.Peers.Lookup(s.config.ID)
+	p := s.peers.Lookup(s.config.ID)
 	if p == nil {
-		return fmt.Errorf("%w: peers=%s, id=%s", ErrPlacerUnknownID, s.config.Peers, s.config.ID)
+		return fmt.Errorf("%w: peers=%s, id=%s", ErrPlacerUnknownID, s.config.PeerMap, s.config.ID)
 	}
 
 	config := raft.DefaultConfig()
@@ -153,12 +155,12 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 	s.rn = rn
-	s.rn.BootstrapCluster(s.config.Peers.Configuration())
+	s.rn.BootstrapCluster(s.peers.Configuration())
 
 	s.server = &http.Server{
 		Addr: s.config.Host,
 		Handler: peers.
-			Mux(p).
+			ServeMux(p).
 			HandleFunc(api.RpcGetMembers, hyped.Provider(s.HandleGetMembers)).
 			HandleFunc(api.RpcAskLeader, hyped.Provider(s.HandleAskLeader)).
 			Build(),
@@ -173,12 +175,11 @@ func (s *placerServer) Shutdown(ctx context.Context) error {
 	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
 }
 
-func (s *placerServer) HandleGetMembers() (*raft.Configuration, error) {
-	conf := s.GetMembers().Configuration()
-	return &conf, nil
+func (s *placerServer) HandleGetMembers() (raft.Configuration, error) {
+	return s.GetMembers().Configuration(), nil
 }
 
-func (s *placerServer) HandleAskLeader() (*api.PeerInfo, error) {
+func (s *placerServer) HandleAskLeader() (api.Peer, error) {
 	return s.AskLeader(nil)
 }
 
@@ -197,11 +198,11 @@ func (s *placerServer) Restore(snapshot io.ReadCloser) error {
 	panic("implement me")
 }
 
-func (s *placerServer) GetMembers() api.Peers { return s.config.Peers }
+func (s *placerServer) GetMembers() api.Peers { return s.peers }
 
-func (s *placerServer) AskLeader(api.Peer) (*api.PeerInfo, error) {
-	leader, id := s.rn.LeaderWithID()
-	return &api.PeerInfo{ID: id, Peer: peers.Voter(leader)}, nil
+func (s *placerServer) AskLeader(api.Peer) (api.Peer, error) {
+	_, id := s.rn.LeaderWithID()
+	return s.peers.Lookup(id), nil
 }
 
 func (s *placerServer) LookupMetaService(key api.MetaKey) (api.MetaService, error) {

@@ -22,7 +22,7 @@ func DefaultGatewayConfig() *GatewayConfig {
 	return &GatewayConfig{
 		Host: api.DefaultGatewayHost,
 		Placer: clients.PlacerConfig{
-			Peers:         DefaultPlacerPeers,
+			PeerMap:       DefaultPlacerHostMap,
 			ClientTimeout: DefaultPeersIOTimeout,
 		},
 	}
@@ -30,6 +30,7 @@ func DefaultGatewayConfig() *GatewayConfig {
 
 type gateway struct {
 	config   *GatewayConfig
+	peers    api.Peers
 	server   *http.Server
 	placerCl api.Placer
 	metaCl   api.MetaService
@@ -43,17 +44,18 @@ func (*gateway) Name() string { return "gateway" }
 
 func (g *gateway) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&g.config.Host, "host", api.DefaultGatewayHost, "listen host")
-	f.StringVar(&g.config.rawPlacerPeers, "placer-hosts", DefaultPlacerHosts.String(), "placer hosts URL")
+	f.StringVar(&g.config.rawPlacerPeers, "placer-hosts", DefaultPlacerHostMap.String(), "placer hosts URL")
 }
 
 func (g *gateway) Setup() error {
 	if g.config.rawPlacerPeers != "" {
-		ps, err := peers.ParsePeers(g.config.rawPlacerPeers)
+		ps, err := api.ParseAddressMap(g.config.rawPlacerPeers)
 		if err != nil {
 			return err
 		}
-		g.config.Placer.Peers = ps
+		g.config.Placer.PeerMap = ps
 	}
+	g.peers = peers.NewPeers(g.config.Placer.PeerMap)
 
 	placerCl, err := clients.NewPlacer(&g.config.Placer)
 	if err != nil {
