@@ -1,16 +1,12 @@
-package servers
+package placers
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"net/http"
 	"path/filepath"
-	"time"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 
@@ -20,52 +16,7 @@ import (
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
-const (
-	DefaultPlacerDataDir        = "placer-data"
-	DefaultPlacerSnapshotRetain = 10
-	DefaultPlacerLogCacheCap    = 128
-	DefaultPlacerPeersConnPool  = 10
-	DefaultPlacerPeersIOTimeout = 15 * time.Second
-
-	PlacerLogDBFile    = "placer.log.bolt"
-	PlacerStableDBFile = "placer.stable.bolt"
-)
-
-var (
-	ErrPlacerUnknownID = errors.New("unknown placer ID")
-
-	DefaultPlacerPeerMap = api.NewAddressMap(api.RaftScheme).Join(api.DefaultPlacerID, api.DefaultPlacerPeer)
-)
-
-type PlacerConfig struct {
-	Host           string
-	ID             raft.ServerID
-	PeerMap        *api.AddressMap
-	DataDir        string
-	SnapshotRetain int
-	LogCacheCap    int
-	PeersConnPool  int
-	PeersIOTimeout time.Duration
-
-	rawPeers string
-}
-
-func DefaultPlacerConfig() *PlacerConfig {
-	return &PlacerConfig{
-		Host:           api.DefaultPlacerHost,
-		ID:             api.DefaultPlacerID,
-		PeerMap:        DefaultPlacerPeerMap,
-		DataDir:        DefaultPlacerDataDir,
-		SnapshotRetain: DefaultPlacerSnapshotRetain,
-		LogCacheCap:    DefaultPlacerLogCacheCap,
-		PeersConnPool:  DefaultPlacerPeersConnPool,
-		PeersIOTimeout: DefaultPlacerPeersIOTimeout,
-	}
-}
-
-func (c *PlacerConfig) hcLogger(name string) hclog.Logger {
-	return logs.HcLogger(fmt.Sprintf("%s-%s", c.ID, name))
-}
+var ErrPlacerUnknownID = errors.New("unknown placer ID")
 
 type placerServer struct {
 	config *PlacerConfig
@@ -161,59 +112,4 @@ func (s *placerServer) Setup() error {
 	}
 
 	return nil
-}
-
-func (s *placerServer) ListenAndServe() error { return s.server.ListenAndServe() }
-func (s *placerServer) Shutdown(ctx context.Context) error {
-	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
-}
-
-func (s *placerServer) HandleGetMembers() (raft.Configuration, error) {
-	return s.GetMembers().Configuration(), nil
-}
-
-func (s *placerServer) HandleAskLeader() (api.Peer, error) {
-	return s.AskLeader(nil)
-}
-
-func (s *placerServer) Apply(log *raft.Log) interface{} {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *placerServer) Snapshot() (raft.FSMSnapshot, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *placerServer) Restore(snapshot io.ReadCloser) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *placerServer) GetMembers() api.Peers { return s.peers }
-
-func (s *placerServer) AskLeader(api.Peer) (api.Peer, error) {
-	_, id := s.rn.LeaderWithID()
-	return s.peers.Lookup(id), nil
-}
-
-func (s *placerServer) LookupMetaService(key api.MetaKey) (api.MetaService, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *placerServer) AddMetaService() error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *placerServer) LookupDataService(id api.DataPartitionID) (api.DataService, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *placerServer) AddDataService() error {
-	//TODO implement me
-	panic("implement me")
 }
