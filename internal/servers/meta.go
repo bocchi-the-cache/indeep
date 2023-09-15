@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"net/http"
+	"time"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
@@ -23,7 +24,7 @@ func DefaultMetaserverConfig() *MetaserverConfig {
 		Host: api.DefaultMetaserverHost,
 		Placer: clients.PlacerConfig{
 			PeerMap:       DefaultPlacerPeerMap,
-			ClientTimeout: DefaultPeersIOTimeout,
+			ClientTimeout: 15 * time.Second,
 		},
 	}
 }

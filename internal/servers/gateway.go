@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"net/http"
+	"time"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
@@ -23,7 +24,7 @@ func DefaultGatewayConfig() *GatewayConfig {
 		Host: api.DefaultGatewayHost,
 		Placer: clients.PlacerConfig{
 			PeerMap:       DefaultPlacerHostMap,
-			ClientTimeout: DefaultPeersIOTimeout,
+			ClientTimeout: 15 * time.Second,
 		},
 	}
 }

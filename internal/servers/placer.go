@@ -21,13 +21,13 @@ import (
 )
 
 const (
-	DefaultSnapshotDir    = "."
-	DefaultSnapshotRetain = 10
-	DefaultLogDBFile      = "placer.log.bolt"
-	DefaultLogCacheCap    = 128
-	DefaultStableDBFile   = "placer.stable.bolt"
-	DefaultPeersConnPool  = 10
-	DefaultPeersIOTimeout = 15 * time.Second
+	DefaultPlacerDataDir        = "placer-data"
+	DefaultPlacerSnapshotRetain = 10
+	DefaultPlacerLogDBFile      = "placer.log.bolt"
+	DefaultPlacerLogCacheCap    = 128
+	DefaultPlacerStableDBFile   = "placer.stable.bolt"
+	DefaultPlacerPeersConnPool  = 10
+	DefaultPlacerPeersIOTimeout = 15 * time.Second
 )
 
 var (
@@ -35,15 +35,15 @@ var (
 
 	DefaultPlacerPeerMap = api.NewAddressMap(api.RaftScheme).Join(api.DefaultPlacerID, api.DefaultPlacerPeer)
 	DefaultPlacerHostMap = api.NewAddressMap(api.HostScheme).Join(api.DefaultPlacerID, api.DefaultPlacerHost)
-	DefaultLogDBPath     = filepath.Join(DefaultSnapshotDir, DefaultLogDBFile)
-	DefaultStableDBPath  = filepath.Join(DefaultSnapshotDir, DefaultStableDBFile)
+	DefaultLogDBPath     = filepath.Join(DefaultPlacerDataDir, DefaultPlacerLogDBFile)
+	DefaultStableDBPath  = filepath.Join(DefaultPlacerDataDir, DefaultPlacerStableDBFile)
 )
 
 type PlacerConfig struct {
 	Host           string
 	ID             raft.ServerID
 	PeerMap        *api.AddressMap
-	SnapshotDir    string
+	DataDir        string
 	SnapshotRetain int
 	LogDBPath      string
 	LogCacheCap    int
@@ -59,13 +59,13 @@ func DefaultPlacerConfig() *PlacerConfig {
 		Host:           api.DefaultPlacerHost,
 		ID:             api.DefaultPlacerID,
 		PeerMap:        DefaultPlacerPeerMap,
-		SnapshotDir:    DefaultSnapshotDir,
-		SnapshotRetain: DefaultSnapshotRetain,
+		DataDir:        DefaultPlacerDataDir,
+		SnapshotRetain: DefaultPlacerSnapshotRetain,
 		LogDBPath:      DefaultLogDBPath,
-		LogCacheCap:    DefaultLogCacheCap,
+		LogCacheCap:    DefaultPlacerLogCacheCap,
 		StableDBPath:   DefaultStableDBPath,
-		PeersConnPool:  DefaultPeersConnPool,
-		PeersIOTimeout: DefaultPeersIOTimeout,
+		PeersConnPool:  DefaultPlacerPeersConnPool,
+		PeersIOTimeout: DefaultPlacerPeersIOTimeout,
 	}
 }
 
@@ -89,12 +89,12 @@ func (s *placerServer) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&s.config.Host, "host", api.DefaultPlacerHost, "listen host")
 	f.StringVar((*string)(&s.config.ID), "id", string(api.DefaultPlacerID), "placer ID")
 	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerPeerMap.String(), "placer peers URL")
-	f.StringVar(&s.config.SnapshotDir, "snap-dir", DefaultSnapshotDir, "Raft snapshot base directory")
-	f.IntVar(&s.config.SnapshotRetain, "snap-retain", DefaultSnapshotRetain, "Raft snapshots to retain")
+	f.StringVar(&s.config.DataDir, "data-dir", DefaultPlacerDataDir, "data directory")
+	f.IntVar(&s.config.SnapshotRetain, "snap-retain", DefaultPlacerSnapshotRetain, "Raft snapshots to retain")
 	f.StringVar(&s.config.LogDBPath, "logdb", DefaultLogDBPath, "Raft log store path")
-	f.IntVar(&s.config.LogCacheCap, "logcache-cap", DefaultLogCacheCap, "Raft log cache capacity")
+	f.IntVar(&s.config.LogCacheCap, "logcache-cap", DefaultPlacerLogCacheCap, "Raft log cache capacity")
 	f.StringVar(&s.config.StableDBPath, "stabledb", DefaultStableDBPath, "Raft stable store path")
-	f.IntVar(&s.config.PeersConnPool, "conn-pool", DefaultPeersConnPool, "peer connections to pool")
+	f.IntVar(&s.config.PeersConnPool, "conn-pool", DefaultPlacerPeersConnPool, "peer connections to pool")
 }
 
 func (s *placerServer) Setup() error {
@@ -117,7 +117,7 @@ func (s *placerServer) Setup() error {
 	config.Logger = s.config.hcLogger("raft")
 
 	snaps, err := raft.NewFileSnapshotStoreWithLogger(
-		s.config.SnapshotDir,
+		s.config.DataDir,
 		s.config.SnapshotRetain,
 		s.config.hcLogger("snaps"),
 	)
