@@ -23,20 +23,18 @@ import (
 const (
 	DefaultPlacerDataDir        = "placer-data"
 	DefaultPlacerSnapshotRetain = 10
-	DefaultPlacerLogDBFile      = "placer.log.bolt"
 	DefaultPlacerLogCacheCap    = 128
-	DefaultPlacerStableDBFile   = "placer.stable.bolt"
 	DefaultPlacerPeersConnPool  = 10
 	DefaultPlacerPeersIOTimeout = 15 * time.Second
+
+	PlacerLogDBFile    = "placer.log.bolt"
+	PlacerStableDBFile = "placer.stable.bolt"
 )
 
 var (
 	ErrPlacerUnknownID = errors.New("unknown placer ID")
 
 	DefaultPlacerPeerMap = api.NewAddressMap(api.RaftScheme).Join(api.DefaultPlacerID, api.DefaultPlacerPeer)
-	DefaultPlacerHostMap = api.NewAddressMap(api.HostScheme).Join(api.DefaultPlacerID, api.DefaultPlacerHost)
-	DefaultLogDBPath     = filepath.Join(DefaultPlacerDataDir, DefaultPlacerLogDBFile)
-	DefaultStableDBPath  = filepath.Join(DefaultPlacerDataDir, DefaultPlacerStableDBFile)
 )
 
 type PlacerConfig struct {
@@ -45,9 +43,7 @@ type PlacerConfig struct {
 	PeerMap        *api.AddressMap
 	DataDir        string
 	SnapshotRetain int
-	LogDBPath      string
 	LogCacheCap    int
-	StableDBPath   string
 	PeersConnPool  int
 	PeersIOTimeout time.Duration
 
@@ -61,9 +57,7 @@ func DefaultPlacerConfig() *PlacerConfig {
 		PeerMap:        DefaultPlacerPeerMap,
 		DataDir:        DefaultPlacerDataDir,
 		SnapshotRetain: DefaultPlacerSnapshotRetain,
-		LogDBPath:      DefaultLogDBPath,
 		LogCacheCap:    DefaultPlacerLogCacheCap,
-		StableDBPath:   DefaultStableDBPath,
 		PeersConnPool:  DefaultPlacerPeersConnPool,
 		PeersIOTimeout: DefaultPlacerPeersIOTimeout,
 	}
@@ -87,14 +81,13 @@ func (*placerServer) Name() string { return "placer" }
 
 func (s *placerServer) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&s.config.Host, "host", api.DefaultPlacerHost, "listen host")
-	f.StringVar((*string)(&s.config.ID), "id", string(api.DefaultPlacerID), "placer ID")
+	f.StringVar((*string)(&s.config.ID), "id", api.DefaultPlacerID, "placer ID")
 	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerPeerMap.String(), "placer peers URL")
 	f.StringVar(&s.config.DataDir, "data-dir", DefaultPlacerDataDir, "data directory")
 	f.IntVar(&s.config.SnapshotRetain, "snap-retain", DefaultPlacerSnapshotRetain, "Raft snapshots to retain")
-	f.StringVar(&s.config.LogDBPath, "logdb", DefaultLogDBPath, "Raft log store path")
 	f.IntVar(&s.config.LogCacheCap, "logcache-cap", DefaultPlacerLogCacheCap, "Raft log cache capacity")
-	f.StringVar(&s.config.StableDBPath, "stabledb", DefaultStableDBPath, "Raft stable store path")
 	f.IntVar(&s.config.PeersConnPool, "conn-pool", DefaultPlacerPeersConnPool, "peer connections to pool")
+	f.DurationVar(&s.config.PeersIOTimeout, "io-timeout", DefaultPlacerPeersIOTimeout, "peer IO timeout")
 }
 
 func (s *placerServer) Setup() error {
@@ -136,7 +129,7 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	logDB, err := raftboltdb.New(raftboltdb.Options{Path: s.config.LogDBPath})
+	logDB, err := raftboltdb.New(raftboltdb.Options{Path: filepath.Join(s.config.DataDir, PlacerLogDBFile)})
 	if err != nil {
 		return err
 	}
@@ -145,7 +138,7 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	stableDB, err := raftboltdb.New(raftboltdb.Options{Path: s.config.StableDBPath})
+	stableDB, err := raftboltdb.New(raftboltdb.Options{Path: filepath.Join(s.config.DataDir, PlacerStableDBFile)})
 	if err != nil {
 		return err
 	}

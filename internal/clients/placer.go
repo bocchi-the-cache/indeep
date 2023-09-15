@@ -10,7 +10,7 @@ import (
 )
 
 type PlacerConfig struct {
-	PeerMap       *api.AddressMap
+	HostMap       *api.AddressMap
 	ClientTimeout time.Duration
 }
 
@@ -25,7 +25,7 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	cl := &placerClient{
 		config:  c,
 		rpc:     hyped.NewRPC(&http.Client{Timeout: c.ClientTimeout}),
-		members: peers.NewPeers(c.PeerMap),
+		members: peers.NewPeers(c.HostMap),
 	}
 	leader, err := api.AskLeader(cl)
 	if err != nil {

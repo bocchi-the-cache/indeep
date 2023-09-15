@@ -1,6 +1,7 @@
 package api
 
 const (
+	DefaultMetaserverID        = "metaserver0"
 	DefaultMetaserverHost      = "127.0.0.1:11651"
 	DefaultMetaServerMultiPeer = "127.0.0.1:11661"
 )
