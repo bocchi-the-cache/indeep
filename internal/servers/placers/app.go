@@ -33,7 +33,7 @@ func (*placerServer) Name() string { return "placer" }
 func (s *placerServer) DefineFlags(f *flag.FlagSet) {
 	f.StringVar(&s.config.Host, "host", api.DefaultPlacerHost, "listen host")
 	f.StringVar((*string)(&s.config.ID), "id", api.DefaultPlacerID, "placer ID")
-	f.StringVar(&s.config.rawPeers, "peers", DefaultPlacerPeerMap.String(), "placer peers URL")
+	f.StringVar(&s.config.rawPeers, "peers", api.DefaultPlacerPeerMap.String(), "placer peers URL")
 	f.StringVar(&s.config.DataDir, "data-dir", DefaultPlacerDataDir, "data directory")
 	f.IntVar(&s.config.SnapshotRetain, "snap-retain", DefaultPlacerSnapshotRetain, "Raft snapshots to retain")
 	f.IntVar(&s.config.LogCacheCap, "logcache-cap", DefaultPlacerLogCacheCap, "Raft log cache capacity")

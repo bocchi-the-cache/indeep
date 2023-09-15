@@ -1,33 +1,14 @@
 package gateways
 
 import (
-	"context"
 	"flag"
 	"net/http"
-	"time"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
-
-type GatewayConfig struct {
-	Host   string
-	Placer clients.PlacerConfig
-
-	rawPlacerHosts string
-}
-
-func DefaultGatewayConfig() *GatewayConfig {
-	return &GatewayConfig{
-		Host: api.DefaultGatewayHost,
-		Placer: clients.PlacerConfig{
-			HostMap:       api.DefaultPlacerHostMap,
-			ClientTimeout: 15 * time.Second,
-		},
-	}
-}
 
 type gateway struct {
 	config   *GatewayConfig
@@ -75,6 +56,3 @@ func (g *gateway) Setup() error {
 
 	return nil
 }
-
-func (g *gateway) ListenAndServe() error              { return g.server.ListenAndServe() }
-func (g *gateway) Shutdown(ctx context.Context) error { return g.server.Shutdown(ctx) }

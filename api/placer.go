@@ -13,7 +13,10 @@ const (
 	RpcAddDataService    RpcID = "add-data-service"
 )
 
-var DefaultPlacerHostMap = NewAddressMap(HostScheme).Join(DefaultPlacerID, DefaultPlacerHost)
+var (
+	DefaultPlacerHostMap = NewAddressMap(HostScheme).Join(DefaultPlacerID, DefaultPlacerHost)
+	DefaultPlacerPeerMap = NewAddressMap(RaftScheme).Join(DefaultPlacerID, DefaultPlacerPeer)
+)
 
 type Placer interface {
 	Member

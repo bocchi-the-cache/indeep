@@ -22,8 +22,6 @@ const (
 	PlacerStableDBFile = "placer.stable.bolt"
 )
 
-var DefaultPlacerPeerMap = api.NewAddressMap(api.RaftScheme).Join(api.DefaultPlacerID, api.DefaultPlacerPeer)
-
 type PlacerConfig struct {
 	Host           string
 	ID             raft.ServerID
@@ -41,7 +39,7 @@ func DefaultPlacerConfig() *PlacerConfig {
 	return &PlacerConfig{
 		Host:           api.DefaultPlacerHost,
 		ID:             api.DefaultPlacerID,
-		PeerMap:        DefaultPlacerPeerMap,
+		PeerMap:        api.DefaultPlacerPeerMap,
 		DataDir:        DefaultPlacerDataDir,
 		SnapshotRetain: DefaultPlacerSnapshotRetain,
 		LogCacheCap:    DefaultPlacerLogCacheCap,

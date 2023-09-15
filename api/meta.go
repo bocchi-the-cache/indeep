@@ -6,6 +6,8 @@ const (
 	DefaultMetaServerMultiPeer = "127.0.0.1:11661"
 )
 
+var DefaultMetaserverMultipeerMap = NewAddressMap(RaftScheme).Join(DefaultMetaserverID, DefaultMetaServerMultiPeer)
+
 type MetaKey interface {
 	ClientID() string
 	Bucket() string
