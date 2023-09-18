@@ -20,6 +20,7 @@ import (
 var ErrPlacerUnknownID = errors.New("unknown placer ID")
 
 type placerServer struct {
+	*databases.DB
 	config *PlacerConfig
 	peers  api.Peers
 	server *http.Server
@@ -71,6 +72,11 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
+	stableDB, err := raftboltdb.New(raftboltdb.Options{Path: filepath.Join(s.config.DataDir, PlacerStableDBFile)})
+	if err != nil {
+		return err
+	}
+
 	logDB, err := raftboltdb.New(raftboltdb.Options{Path: filepath.Join(s.config.DataDir, PlacerLogDBFile)})
 	if err != nil {
 		return err
@@ -84,9 +90,9 @@ func (s *placerServer) Setup() error {
 	if err != nil {
 		return err
 	}
+	s.DB = db
 
-	// TODO: Use raftboltdb as log store and stable store.
-	rn, err := raft.NewRaft(config, s, cachedLogDB, db, db, trans)
+	rn, err := raft.NewRaft(config, s, cachedLogDB, stableDB, s, trans)
 	if err != nil {
 		return err
 	}
