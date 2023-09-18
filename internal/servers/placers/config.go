@@ -13,13 +13,11 @@ import (
 
 const (
 	DefaultPlacerDataDir        = "placer-data"
-	DefaultPlacerSnapshotRetain = 10
 	DefaultPlacerLogCacheCap    = 128
 	DefaultPlacerPeersConnPool  = 10
 	DefaultPlacerPeersIOTimeout = 15 * time.Second
 
-	PlacerLogDBFile    = "placer.log.bolt"
-	PlacerStableDBFile = "placer.stable.bolt"
+	PlacerLogDBFile = "placer.log.bolt"
 )
 
 type PlacerConfig struct {
@@ -27,7 +25,6 @@ type PlacerConfig struct {
 	ID             raft.ServerID
 	PeerMap        *api.AddressMap
 	DataDir        string
-	SnapshotRetain int
 	LogCacheCap    int
 	PeersConnPool  int
 	PeersIOTimeout time.Duration
@@ -41,7 +38,6 @@ func DefaultPlacerConfig() *PlacerConfig {
 		ID:             api.DefaultPlacerID,
 		PeerMap:        api.DefaultPlacerPeerMap,
 		DataDir:        DefaultPlacerDataDir,
-		SnapshotRetain: DefaultPlacerSnapshotRetain,
 		LogCacheCap:    DefaultPlacerLogCacheCap,
 		PeersConnPool:  DefaultPlacerPeersConnPool,
 		PeersIOTimeout: DefaultPlacerPeersIOTimeout,

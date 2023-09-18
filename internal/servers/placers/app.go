@@ -11,6 +11,7 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 
 	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/databases"
 	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
@@ -35,7 +36,6 @@ func (s *placerServer) DefineFlags(f *flag.FlagSet) {
 	f.StringVar((*string)(&s.config.ID), "id", api.DefaultPlacerID, "placer ID")
 	f.StringVar(&s.config.rawPeers, "peers", api.DefaultPlacerPeerMap.String(), "placer peers URL")
 	f.StringVar(&s.config.DataDir, "data-dir", DefaultPlacerDataDir, "data directory")
-	f.IntVar(&s.config.SnapshotRetain, "snap-retain", DefaultPlacerSnapshotRetain, "Raft snapshots to retain")
 	f.IntVar(&s.config.LogCacheCap, "logcache-cap", DefaultPlacerLogCacheCap, "Raft log cache capacity")
 	f.IntVar(&s.config.PeersConnPool, "conn-pool", DefaultPlacerPeersConnPool, "peer connections to pool")
 	f.DurationVar(&s.config.PeersIOTimeout, "io-timeout", DefaultPlacerPeersIOTimeout, "peer IO timeout")
@@ -60,15 +60,6 @@ func (s *placerServer) Setup() error {
 	config.LocalID = s.config.ID
 	config.Logger = s.config.hcLogger("raft")
 
-	snaps, err := raft.NewFileSnapshotStoreWithLogger(
-		s.config.DataDir,
-		s.config.SnapshotRetain,
-		s.config.hcLogger("snaps"),
-	)
-	if err != nil {
-		return err
-	}
-
 	trans, err := raft.NewTCPTransportWithLogger(
 		p.Address().Host,
 		nil,
@@ -89,12 +80,13 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	stableDB, err := raftboltdb.New(raftboltdb.Options{Path: filepath.Join(s.config.DataDir, PlacerStableDBFile)})
+	db, err := databases.Open(filepath.Join(s.config.DataDir, "db"))
 	if err != nil {
 		return err
 	}
 
-	rn, err := raft.NewRaft(config, s, cachedLogDB, stableDB, snaps, trans)
+	// TODO: Use raftboltdb as log store and stable store.
+	rn, err := raft.NewRaft(config, s, cachedLogDB, db, db, trans)
 	if err != nil {
 		return err
 	}
