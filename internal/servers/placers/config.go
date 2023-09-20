@@ -17,8 +17,9 @@ const (
 	DefaultPlacerPeersConnPool  = 10
 	DefaultPlacerPeersIOTimeout = 15 * time.Second
 
-	PlacerLogDBFile    = "placer.log.bolt"
-	PlacerStableDBFile = "placer.stable.bolt"
+	PlacerLogDBFile          = "placer.log.bolt"
+	PlacerStableDBFile       = "placer.stable.bolt"
+	PlacerSnapshotMetaDBFile = "placer.snapmeta.bolt"
 )
 
 type PlacerConfig struct {

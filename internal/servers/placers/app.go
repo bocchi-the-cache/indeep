@@ -11,16 +11,15 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/databases"
 	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
+	"github.com/bocchi-the-cache/indeep/internal/snapmetadb"
 )
 
 var ErrPlacerUnknownID = errors.New("unknown placer ID")
 
 type placerServer struct {
-	*databases.DB
 	config *PlacerConfig
 	peers  api.Peers
 	server *http.Server
@@ -86,13 +85,12 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	db, err := databases.Open(filepath.Join(s.config.DataDir, "db"))
+	snapMetaDB, err := snapmetadb.Open(filepath.Join(s.config.DataDir, PlacerSnapshotMetaDBFile))
 	if err != nil {
 		return err
 	}
-	s.DB = db
 
-	rn, err := raft.NewRaft(config, s, cachedLogDB, stableDB, s, trans)
+	rn, err := raft.NewRaft(config, s, cachedLogDB, stableDB, snapMetaDB, trans)
 	if err != nil {
 		return err
 	}
