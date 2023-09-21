@@ -1,12 +1,13 @@
 package api
 
-import (
-	"errors"
+import "errors"
+
+const (
+	RpcMemberGetMembers RpcID = "get-members"
+	RpcMemberAskLeader  RpcID = "ask-leader"
 )
 
-var (
-	ErrEmptyMembers = errors.New("empty members")
-)
+var ErrEmptyMembers = errors.New("empty members")
 
 type Member interface {
 	GetMembers() Peers

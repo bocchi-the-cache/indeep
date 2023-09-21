@@ -39,28 +39,13 @@ func (c *placerClient) GetMembers() api.Peers { return c.members }
 
 func (c *placerClient) AskLeader(p api.Peer) (api.Peer, error) {
 	leader := peers.DefaultPeer()
-	if err := c.rpc.Get(p, api.RpcAskLeader, leader); err != nil {
+	if err := c.rpc.Get(p, api.RpcMemberAskLeader, leader); err != nil {
 		return nil, err
 	}
 	return leader, nil
 }
 
-func (c *placerClient) LookupMetaService(key api.MetaKey) (api.MetaService, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *placerClient) AddMetaService() error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *placerClient) LookupDataService(id api.DataPartitionID) (api.DataService, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *placerClient) AddDataService() error {
-	//TODO implement me
-	panic("implement me")
+func (c *placerClient) ListGroups() (ret []api.GroupID, err error) {
+	err = c.rpc.Get(c.leader, api.RpcPlacerListGroups, &ret)
+	return
 }

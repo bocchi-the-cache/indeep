@@ -35,7 +35,6 @@ func (m *metaserver) DefineFlags(f *flag.FlagSet) {
 	f.StringVar((*string)(&m.config.ID), "id", api.DefaultMetaserverID, "placer ID")
 	f.StringVar(&m.config.rawPeers, "peers", api.DefaultMetaserverMultipeerMap.String(), "metaserver peers URL")
 	f.StringVar(&m.config.DataDir, "data-dir", DefaultMetaserverDataDir, "data directory")
-	f.IntVar(&m.config.SnapshotRetain, "snap-retain", DefaultMetaserverSnapshotRetain, "Raft snapshots to retain")
 	f.IntVar(&m.config.LogCacheCap, "logcache-cap", DefaultMetaserverLogCacheCap, "Raft log cache capacity")
 	f.IntVar(&m.config.PeersConnPool, "conn-pool", DefaultMetaserverPeersConnPool, "peer connections to pool")
 	f.DurationVar(&m.config.PeersIOTimeout, "io-timeout", DefaultMetaserverPeersIOTimeout, "peer IO timeout")

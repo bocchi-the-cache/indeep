@@ -11,6 +11,8 @@ type Mapper interface {
 	Get() (*raft.SnapshotMeta, error)
 }
 
+var _ = (Mapper)((*DB)(nil))
+
 func (d *DB) Save(meta raft.SnapshotMeta) error {
 	{
 		bytes := make([]byte, 8)

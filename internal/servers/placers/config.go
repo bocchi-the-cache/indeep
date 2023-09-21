@@ -2,6 +2,7 @@ package placers
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -20,6 +21,7 @@ const (
 	PlacerLogDBFile          = "placer.log.bolt"
 	PlacerStableDBFile       = "placer.stable.bolt"
 	PlacerSnapshotMetaDBFile = "placer.snapmeta.bolt"
+	PlacerSnapshotDir        = "snapshot"
 )
 
 type PlacerConfig struct {
@@ -48,4 +50,8 @@ func DefaultPlacerConfig() *PlacerConfig {
 
 func (c *PlacerConfig) hcLogger(name string) hclog.Logger {
 	return logs.HcLogger(fmt.Sprintf("%s-%s", c.ID, name))
+}
+
+func (c *PlacerConfig) WithDataDir(elem ...string) string {
+	return filepath.Join(append([]string{c.DataDir}, elem...)...)
 }

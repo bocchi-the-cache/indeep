@@ -5,8 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"path/filepath"
+	"os"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 
@@ -24,6 +25,7 @@ type placerServer struct {
 	peers  api.Peers
 	server *http.Server
 	rn     *raft.Raft
+	db     *pebble.DB
 }
 
 func NewPlacer(c *PlacerConfig) api.Server { return &placerServer{config: c} }
@@ -56,6 +58,16 @@ func (s *placerServer) Setup() error {
 		return fmt.Errorf("%w: peers=%s, id=%s", ErrPlacerUnknownID, s.config.PeerMap, s.config.ID)
 	}
 
+	if err := os.MkdirAll(s.config.DataDir, 0755); err != nil {
+		return err
+	}
+
+	db, err := pebble.Open(s.config.WithDataDir(PlacerSnapshotDir), new(pebble.Options))
+	if err != nil {
+		return err
+	}
+	s.db = db
+
 	config := raft.DefaultConfig()
 	config.LocalID = s.config.ID
 	config.Logger = s.config.hcLogger("raft")
@@ -71,12 +83,12 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	stableDB, err := raftboltdb.New(raftboltdb.Options{Path: filepath.Join(s.config.DataDir, PlacerStableDBFile)})
+	stableDB, err := raftboltdb.New(raftboltdb.Options{Path: s.config.WithDataDir(PlacerStableDBFile)})
 	if err != nil {
 		return err
 	}
 
-	logDB, err := raftboltdb.New(raftboltdb.Options{Path: filepath.Join(s.config.DataDir, PlacerLogDBFile)})
+	logDB, err := raftboltdb.New(raftboltdb.Options{Path: s.config.WithDataDir(PlacerLogDBFile)})
 	if err != nil {
 		return err
 	}
@@ -85,7 +97,7 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	snapMetaDB, err := snapmetadb.Open(filepath.Join(s.config.DataDir, PlacerSnapshotMetaDBFile))
+	snapMetaDB, err := snapmetadb.Open(s.config.WithDataDir(PlacerSnapshotMetaDBFile))
 	if err != nil {
 		return err
 	}
@@ -101,8 +113,9 @@ func (s *placerServer) Setup() error {
 		Addr: s.config.Host,
 		Handler: peers.
 			ServeMux(p).
-			HandleFunc(api.RpcGetMembers, hyped.Provider(s.HandleGetMembers)).
-			HandleFunc(api.RpcAskLeader, hyped.Provider(s.HandleAskLeader)).
+			HandleFunc(api.RpcMemberGetMembers, hyped.Provider(s.handleGetMembers)).
+			HandleFunc(api.RpcMemberAskLeader, hyped.Provider(s.handleAskLeader)).
+			HandleFunc(api.RpcPlacerListGroups, hyped.Provider(s.handleListGroups)).
 			Build(),
 		ErrorLog: logs.E,
 	}

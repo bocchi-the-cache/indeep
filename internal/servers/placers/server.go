@@ -14,10 +14,14 @@ func (s *placerServer) Shutdown(ctx context.Context) error {
 	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
 }
 
-func (s *placerServer) HandleGetMembers() (raft.Configuration, error) {
+func (s *placerServer) handleGetMembers() (raft.Configuration, error) {
 	return s.GetMembers().Configuration(), nil
 }
 
-func (s *placerServer) HandleAskLeader() (api.Peer, error) {
+func (s *placerServer) handleAskLeader() (api.Peer, error) {
 	return s.AskLeader(nil)
+}
+
+func (s *placerServer) handleListGroups() ([]api.GroupID, error) {
+	return s.ListGroups()
 }

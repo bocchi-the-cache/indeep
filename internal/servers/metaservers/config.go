@@ -11,7 +11,6 @@ import (
 
 const (
 	DefaultMetaserverDataDir        = "metaserver-data"
-	DefaultMetaserverSnapshotRetain = 10
 	DefaultMetaserverLogCacheCap    = 128
 	DefaultMetaserverPeersConnPool  = 10
 	DefaultMetaserverPeersIOTimeout = 15 * time.Second
@@ -22,7 +21,6 @@ type MetaserverConfig struct {
 	ID             raft.ServerID
 	PeerMap        *api.AddressMap
 	DataDir        string
-	SnapshotRetain int
 	LogCacheCap    int
 	PeersConnPool  int
 	PeersIOTimeout time.Duration

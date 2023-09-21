@@ -1,9 +1,11 @@
 package snapmetadb
 
 import (
+	"errors"
 	"io"
 
 	"github.com/hashicorp/raft"
+	raftboltdb "github.com/hashicorp/raft-boltdb"
 )
 
 const (
@@ -35,6 +37,9 @@ func (d *DB) Create(
 
 func (d *DB) List() ([]*raft.SnapshotMeta, error) {
 	m, err := d.Get()
+	if errors.Is(err, raftboltdb.ErrKeyNotFound) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
