@@ -21,7 +21,7 @@ const (
 	PlacerLogDBFile          = "placer.log.bolt"
 	PlacerStableDBFile       = "placer.stable.bolt"
 	PlacerSnapshotMetaDBFile = "placer.snapmeta.bolt"
-	PlacerSnapshotDir        = "snapshot"
+	PlacerFSMDir             = "fsm"
 )
 
 type PlacerConfig struct {

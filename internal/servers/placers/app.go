@@ -62,7 +62,7 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	db, err := pebble.Open(s.config.WithDataDir(PlacerSnapshotDir), new(pebble.Options))
+	db, err := pebble.Open(s.config.WithDataDir(PlacerFSMDir), new(pebble.Options))
 	if err != nil {
 		return err
 	}
