@@ -3,7 +3,7 @@ module github.com/bocchi-the-cache/indeep
 go 1.21.0
 
 require (
-	github.com/cockroachdb/pebble v0.0.0-20230917032534-be1586403c9b
+	github.com/cockroachdb/pebble v0.0.0-20230922034545-d038189d72d9
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/raft v1.5.0
 	github.com/hashicorp/raft-boltdb v0.0.0-20230125174641-2a8082862702
