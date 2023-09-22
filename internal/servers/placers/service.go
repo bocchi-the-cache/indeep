@@ -1,6 +1,8 @@
 package placers
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/raft"
 
 	"github.com/bocchi-the-cache/indeep/api"
@@ -11,20 +13,31 @@ const DBGroupPrefix = "G"
 
 var _ = (api.Placer)((*placerServer)(nil))
 
-func (s *placerServer) Peers() api.Peers { return s.peers }
-
-func (s *placerServer) AskLeaderID(api.Peer) (raft.ServerID, error) {
+func (s *placerServer) AskLeaderID() (*raft.ServerID, error) {
 	_, id := s.rn.LeaderWithID()
-	return id, nil
+	return &id, nil
 }
 
-func (s *placerServer) ListGroups() (ret []api.GroupID, err error) {
+func (s *placerServer) ListGroups() (*[]api.GroupID, error) {
+	var ret []api.GroupID
 	it, err := s.db.NewIter(utils.PrefixIterOptions(DBGroupPrefix))
 	if err != nil {
-		return
+		return nil, err
 	}
 	for it.First(); it.Valid(); it.Next() {
 		ret = append(ret, api.GroupID(it.Key()[len(DBGroupPrefix):]))
 	}
-	return
+	return &ret, nil
+}
+
+func (s *placerServer) GenerateGroup() (*api.GroupID, error) {
+	// TODO
+	panic("TODO")
+}
+
+func (s *placerServer) CheckLeader() error {
+	if _, leaderID := s.rn.LeaderWithID(); s.config.ID != leaderID {
+		return fmt.Errorf("%w: %s", api.ErrNotLeader, s.config.ID)
+	}
+	return nil
 }

@@ -1,10 +1,9 @@
 package metaservers
 
 import (
+	"context"
 	"flag"
-	"fmt"
 	"net/http"
-	"path/filepath"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
@@ -13,13 +12,11 @@ import (
 )
 
 type metaserver struct {
-	config *MetaserverConfig
-	peers  api.Peers
-	server *http.Server
-
+	config   *MetaserverConfig
+	peers    api.Peers
+	server   *http.Server
 	placerCl api.Placer
-
-	mux api.StreamLayerMux
+	mux      api.StreamLayerMux
 }
 
 func NewMetaserver(c *MetaserverConfig) api.Server { return &metaserver{config: c} }
@@ -46,7 +43,11 @@ func (m *metaserver) Setup() error {
 		}
 		m.config.PeerMap = ps
 	}
-	m.peers = peers.NewPeers(m.config.PeerMap)
+	ps, err := peers.NewPeers(m.config.PeerMap)
+	if err != nil {
+		return err
+	}
+	m.peers = ps
 
 	p, err := m.peers.Lookup(m.config.ID)
 	if err != nil {
@@ -68,12 +69,9 @@ func (m *metaserver) Setup() error {
 	}
 	m.placerCl = placerCl
 
-	groups, err := m.placerCl.ListGroups()
-	if err != nil {
+	if err := m.setupGroups(); err != nil {
 		return err
 	}
-	// TODO: Initialize Raft groups.
-	_ = groups
 
 	// TODO
 	mux := http.NewServeMux()
@@ -87,10 +85,16 @@ func (m *metaserver) Setup() error {
 	return nil
 }
 
-func (m *metaserver) logDBPath(groupID api.GroupID) string {
-	return filepath.Join(m.config.DataDir, fmt.Sprintf("metaserver.log.%s.bolt", groupID))
+func (m *metaserver) setupGroups() error {
+	groups, err := m.placerCl.ListGroups()
+	if err != nil {
+		return err
+	}
+	// TODO
+	_ = groups
+
+	return nil
 }
 
-func (m *metaserver) stableDBPath(groupID api.GroupID) string {
-	return filepath.Join(m.config.DataDir, fmt.Sprintf("metaserver.stable.%s.bolt", groupID))
-}
+func (m *metaserver) ListenAndServe() error              { return m.server.ListenAndServe() }
+func (m *metaserver) Shutdown(ctx context.Context) error { return m.server.Shutdown(ctx) }

@@ -1,11 +1,15 @@
 package hyped
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/bocchi-the-cache/indeep/api"
+)
 
 type (
 	ConsumerFunc[Req any]        func(r *Req) error
-	ProviderFunc[Resp any]       func() (Resp, error)
-	ProcessorFunc[Req, Resp any] func(r *Req) (Resp, error)
+	ProviderFunc[Resp any]       func() (*Resp, error)
+	ProcessorFunc[Req, Resp any] func(r *Req) (*Resp, error)
 )
 
 func ConsumerWith[Req any](c Codec, f ConsumerFunc[Req]) http.HandlerFunc {
@@ -56,4 +60,13 @@ func Consumer[Req any](f ConsumerFunc[Req]) http.HandlerFunc   { return Consumer
 func Provider[Resp any](f ProviderFunc[Resp]) http.HandlerFunc { return ProviderWith(DefaultCodec, f) }
 func Processor[Req, Resp any](f ProcessorFunc[Req, Resp]) http.HandlerFunc {
 	return ProcessorWith(DefaultCodec, f)
+}
+
+func LeaderProvider[Resp any](l api.LeaderChecker, f ProviderFunc[Resp]) http.HandlerFunc {
+	return Provider(func() (*Resp, error) {
+		if err := l.CheckLeader(); err != nil {
+			return nil, err
+		}
+		return f()
+	})
 }

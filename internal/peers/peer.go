@@ -14,12 +14,15 @@ type peers struct {
 	m map[raft.ServerID]api.Peer
 }
 
-func NewPeers(a *api.AddressMap) api.Peers {
+func NewPeers(a *api.AddressMap) (api.Peers, error) {
 	m := make(map[raft.ServerID]api.Peer)
 	for id, host := range a.Addresses() {
 		m[id] = &peer{id: id, addr: api.NewAddress(a.Scheme(), string(host))}
 	}
-	return &peers{m: m}
+	if len(m) == 0 {
+		return nil, api.ErrEmptyPeers
+	}
+	return &peers{m: m}, nil
 }
 
 func (p *peers) Peers() (ret []api.Peer) {

@@ -1,6 +1,8 @@
 package placers
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"net/http"
 	"os"
@@ -47,7 +49,11 @@ func (s *placerServer) Setup() error {
 		}
 		s.config.PeerMap = ps
 	}
-	s.peers = peers.NewPeers(s.config.PeerMap)
+	ps, err := peers.NewPeers(s.config.PeerMap)
+	if err != nil {
+		return err
+	}
+	s.peers = ps
 
 	p, err := s.peers.Lookup(s.config.ID)
 	if err != nil {
@@ -109,12 +115,16 @@ func (s *placerServer) Setup() error {
 		Addr: s.config.Host,
 		Handler: peers.
 			ServeMux(p).
-			HandleFunc(api.RpcMemberGetMembers, hyped.Provider(s.handleGetMembers)).
-			HandleFunc(api.RpcMemberAskLeader, hyped.Provider(s.handleAskLeader)).
-			HandleFunc(api.RpcPlacerListGroups, hyped.Provider(s.handleListGroups)).
+			HandleFunc(api.RpcMemberAskLeaderID, hyped.Provider(s.AskLeaderID)).
+			HandleFunc(api.RpcPlacerListGroups, hyped.LeaderProvider(s, s.ListGroups)).
 			Build(),
 		ErrorLog: logs.E,
 	}
 
 	return nil
+}
+
+func (s *placerServer) ListenAndServe() error { return s.server.ListenAndServe() }
+func (s *placerServer) Shutdown(ctx context.Context) error {
+	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
 }

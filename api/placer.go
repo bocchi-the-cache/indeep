@@ -5,7 +5,8 @@ const (
 	DefaultPlacerHost = "127.0.0.1:11551"
 	DefaultPlacerPeer = "127.0.0.1:11561"
 
-	RpcPlacerListGroups = "list-groups"
+	RpcPlacerListGroups    = "list-groups"
+	RpcPlacerGenerateGroup = "generate-group"
 )
 
 var (
@@ -16,5 +17,6 @@ var (
 type Placer interface {
 	Member
 
-	ListGroups() ([]GroupID, error)
+	ListGroups() (*[]GroupID, error)
+	GenerateGroup() (*GroupID, error)
 }

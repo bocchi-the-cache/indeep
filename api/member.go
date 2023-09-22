@@ -6,21 +6,14 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-const (
-	RpcMemberGetMembers RpcID = "get-members"
-	RpcMemberAskLeader  RpcID = "ask-leader"
-)
+const RpcMemberAskLeaderID RpcID = "ask-leader"
 
-var ErrEmptyMembers = errors.New("empty members")
+var ErrNotLeader = errors.New("not leader")
 
 type Member interface {
-	Peers() Peers
-	AskLeaderID(e Peer) (raft.ServerID, error)
+	AskLeaderID() (*raft.ServerID, error)
 }
 
-func AskLeaderID(m Member) (raft.ServerID, error) {
-	for _, e := range m.Peers().Peers() {
-		return m.AskLeaderID(e)
-	}
-	return "", ErrEmptyMembers
+type LeaderChecker interface {
+	CheckLeader() error
 }

@@ -16,7 +16,4 @@ func (s *placerServer) Snapshot() (raft.FSMSnapshot, error) {
 	panic("implement me")
 }
 
-func (s *placerServer) Restore(snapshot io.ReadCloser) error {
-	//TODO implement me
-	panic("implement me")
-}
+func (*placerServer) Restore(io.ReadCloser) error { return nil }

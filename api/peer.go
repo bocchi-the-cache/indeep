@@ -7,7 +7,10 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-var ErrPeerUnknown = errors.New("peer unknown")
+var (
+	ErrEmptyPeers  = errors.New("empty peers")
+	ErrPeerUnknown = errors.New("peer unknown")
+)
 
 type Peers interface {
 	Peers() []Peer

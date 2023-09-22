@@ -24,16 +24,20 @@ type placerClient struct {
 }
 
 func NewPlacer(c *PlacerConfig) (api.Placer, error) {
-	cl := &placerClient{
-		config:  c,
-		rpc:     hyped.NewRPC(&http.Client{Timeout: c.ClientTimeout}),
-		members: peers.NewPeers(c.HostMap),
-	}
-	leaderID, err := api.AskLeaderID(cl)
+	members, err := peers.NewPeers(c.HostMap)
 	if err != nil {
 		return nil, err
 	}
-	leader, err := cl.members.Lookup(leaderID)
+	cl := &placerClient{
+		config:  c,
+		rpc:     hyped.NewRPC(&http.Client{Timeout: c.ClientTimeout}),
+		members: members,
+	}
+	leaderID, err := cl.AskLeaderID()
+	if err != nil {
+		return nil, err
+	}
+	leader, err := cl.members.Lookup(*leaderID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,14 +45,28 @@ func NewPlacer(c *PlacerConfig) (api.Placer, error) {
 	return cl, nil
 }
 
-func (c *placerClient) Peers() api.Peers { return c.members }
+func (*placerClient) CheckLeader() error { return nil }
 
-func (c *placerClient) AskLeaderID(p api.Peer) (leaderID raft.ServerID, err error) {
-	err = c.rpc.Get(p, api.RpcMemberAskLeader, &leaderID)
-	return
+func (c *placerClient) AskLeaderID() (*raft.ServerID, error) {
+	var leaderID raft.ServerID
+	if err := c.rpc.Get(c.members.Peers()[0], api.RpcMemberAskLeaderID, &leaderID); err != nil {
+		return nil, err
+	}
+	return &leaderID, nil
 }
 
-func (c *placerClient) ListGroups() (ret []api.GroupID, err error) {
-	err = c.rpc.Get(c.leader, api.RpcPlacerListGroups, &ret)
-	return
+func (c *placerClient) ListGroups() (*[]api.GroupID, error) {
+	var ret []api.GroupID
+	if err := c.rpc.Get(c.leader, api.RpcPlacerListGroups, &ret); err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func (c *placerClient) GenerateGroup() (*api.GroupID, error) {
+	var groupID api.GroupID
+	if err := c.rpc.Get(c.leader, api.RpcPlacerGenerateGroup, &groupID); err != nil {
+		return nil, err
+	}
+	return &groupID, nil
 }
