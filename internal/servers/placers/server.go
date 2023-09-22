@@ -15,11 +15,11 @@ func (s *placerServer) Shutdown(ctx context.Context) error {
 }
 
 func (s *placerServer) handleGetMembers() (raft.Configuration, error) {
-	return s.GetMembers().Configuration(), nil
+	return s.Peers().Configuration(), nil
 }
 
-func (s *placerServer) handleAskLeader() (api.Peer, error) {
-	return s.AskLeader(nil)
+func (s *placerServer) handleAskLeader() (raft.ServerID, error) {
+	return s.AskLeaderID(nil)
 }
 
 func (s *placerServer) handleListGroups() ([]api.GroupID, error) {

@@ -1,9 +1,7 @@
 package placers
 
 import (
-	"errors"
 	"flag"
-	"fmt"
 	"net/http"
 	"os"
 
@@ -17,8 +15,6 @@ import (
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 	"github.com/bocchi-the-cache/indeep/internal/snapmetadb"
 )
-
-var ErrPlacerUnknownID = errors.New("unknown placer ID")
 
 type placerServer struct {
 	config *PlacerConfig
@@ -53,9 +49,9 @@ func (s *placerServer) Setup() error {
 	}
 	s.peers = peers.NewPeers(s.config.PeerMap)
 
-	p := s.peers.Lookup(s.config.ID)
-	if p == nil {
-		return fmt.Errorf("%w: peers=%s, id=%s", ErrPlacerUnknownID, s.config.PeerMap, s.config.ID)
+	p, err := s.peers.Lookup(s.config.ID)
+	if err != nil {
+		return err
 	}
 
 	if err := os.MkdirAll(s.config.DataDir, 0755); err != nil {

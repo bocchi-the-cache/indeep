@@ -2,6 +2,7 @@ package peers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/hashicorp/raft"
@@ -39,7 +40,13 @@ func (p *peers) Configuration() (c raft.Configuration) {
 	return
 }
 
-func (p *peers) Lookup(id raft.ServerID) api.Peer { return p.m[id] }
+func (p *peers) Lookup(id raft.ServerID) (api.Peer, error) {
+	peer, ok := p.m[id]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", api.ErrPeerUnknown, id)
+	}
+	return peer, nil
+}
 
 type peerInfo struct {
 	ID      raft.ServerID
@@ -51,8 +58,6 @@ type peer struct {
 	addr *api.Address
 	s    raft.ServerSuffrage
 }
-
-func DefaultPeer() api.Peer { return new(peer) }
 
 func (p *peer) Address() *api.Address         { return p.addr }
 func (p *peer) ID() raft.ServerID             { return p.id }

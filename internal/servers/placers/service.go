@@ -1,21 +1,21 @@
 package placers
 
 import (
+	"github.com/hashicorp/raft"
+
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/utils"
 )
 
-const (
-	DBGroupPrefix = "G"
-)
+const DBGroupPrefix = "G"
 
 var _ = (api.Placer)((*placerServer)(nil))
 
-func (s *placerServer) GetMembers() api.Peers { return s.peers }
+func (s *placerServer) Peers() api.Peers { return s.peers }
 
-func (s *placerServer) AskLeader(api.Peer) (api.Peer, error) {
+func (s *placerServer) AskLeaderID(api.Peer) (raft.ServerID, error) {
 	_, id := s.rn.LeaderWithID()
-	return s.peers.Lookup(id), nil
+	return id, nil
 }
 
 func (s *placerServer) ListGroups() (ret []api.GroupID, err error) {

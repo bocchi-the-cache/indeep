@@ -1,7 +1,6 @@
 package metaservers
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -12,8 +11,6 @@ import (
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
-
-var ErrMetaserverUnknownID = errors.New("unknown metaserver ID")
 
 type metaserver struct {
 	config *MetaserverConfig
@@ -51,10 +48,12 @@ func (m *metaserver) Setup() error {
 	}
 	m.peers = peers.NewPeers(m.config.PeerMap)
 
-	p := m.peers.Lookup(m.config.ID)
-	if p == nil {
-		return fmt.Errorf("%w: peers=%s, id=%s", ErrMetaserverUnknownID, m.config.PeerMap, m.config.ID)
+	p, err := m.peers.Lookup(m.config.ID)
+	if err != nil {
+		return err
 	}
+	// TODO: ServeMux would use this.
+	_ = p
 
 	if m.config.rawPlacerHosts != "" {
 		ps, err := api.ParseAddressMap(m.config.rawPlacerHosts)
@@ -68,6 +67,13 @@ func (m *metaserver) Setup() error {
 		return err
 	}
 	m.placerCl = placerCl
+
+	groups, err := m.placerCl.ListGroups()
+	if err != nil {
+		return err
+	}
+	// TODO: Initialize Raft groups.
+	_ = groups
 
 	// TODO
 	mux := http.NewServeMux()

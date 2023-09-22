@@ -1,6 +1,10 @@
 package api
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/hashicorp/raft"
+)
 
 const (
 	RpcMemberGetMembers RpcID = "get-members"
@@ -10,13 +14,13 @@ const (
 var ErrEmptyMembers = errors.New("empty members")
 
 type Member interface {
-	GetMembers() Peers
-	AskLeader(e Peer) (Peer, error)
+	Peers() Peers
+	AskLeaderID(e Peer) (raft.ServerID, error)
 }
 
-func AskLeader(m Member) (Peer, error) {
-	for _, e := range m.GetMembers().Peers() {
-		return m.AskLeader(e)
+func AskLeaderID(m Member) (raft.ServerID, error) {
+	for _, e := range m.Peers().Peers() {
+		return m.AskLeaderID(e)
 	}
-	return nil, ErrEmptyMembers
+	return "", ErrEmptyMembers
 }

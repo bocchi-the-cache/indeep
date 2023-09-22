@@ -7,12 +7,10 @@ import (
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
-	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
 type gateway struct {
 	config   *GatewayConfig
-	peers    api.Peers
 	server   *http.Server
 	placerCl api.Placer
 	metaCl   api.MetaService
@@ -37,8 +35,6 @@ func (g *gateway) Setup() error {
 		}
 		g.config.Placer.HostMap = ps
 	}
-	g.peers = peers.NewPeers(g.config.Placer.HostMap)
-
 	placerCl, err := clients.NewPlacer(&g.config.Placer)
 	if err != nil {
 		return err
