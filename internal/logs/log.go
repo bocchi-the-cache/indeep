@@ -1,10 +1,12 @@
 package logs
 
 import (
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -16,20 +18,34 @@ func newCore(prefix string) *log.Logger {
 
 var (
 	E = Logger("ERR ")
-	S = SLogger()
+	S = Structured()
 
-	slogCore = newCore("SLOG ")
-	hcCore   = newCore("HC ")
+	slogCore   = newCore("SLOG ")
+	hcCore     = newCore("HC ")
+	pebbleCore = newCore("PEBBLE ")
 )
 
 func Logger(prefix string) *log.Logger {
 	return log.New(os.Stderr, prefix, coreFlags|log.Lshortfile)
 }
 
-func SLogger() *slog.Logger {
+func Structured() *slog.Logger {
 	return slog.New(slog.NewTextHandler(slogCore.Writer(), &slog.HandlerOptions{AddSource: true}))
 }
 
-func HcLogger(name string) hclog.Logger {
+func HashiCorp(name string) hclog.Logger {
 	return hclog.FromStandardLogger(hcCore, &hclog.LoggerOptions{Name: name, IncludeLocation: true})
 }
+
+type pebbleLog struct{ *log.Logger }
+
+func (p *pebbleLog) Infof(format string, args ...interface{}) {
+	_ = p.Logger.Output(2, fmt.Sprintf(format, args...))
+}
+
+func (p *pebbleLog) Fatalf(format string, args ...interface{}) {
+	_ = p.Logger.Output(2, fmt.Sprintf(format, args...))
+	os.Exit(1)
+}
+
+func Pebble() pebble.Logger { return &pebbleLog{pebbleCore} }

@@ -8,6 +8,8 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 )
 
+// FIXME: Dump the FSM DB snapshot, not just record the snapshot meta.
+
 const (
 	SnapshotVersionKey            = "SnapshotVersion"
 	SnapshotIndexKey              = "SnapshotIndex"

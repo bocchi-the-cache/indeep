@@ -12,6 +12,7 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 
 	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/fsmdb"
 	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
@@ -23,7 +24,7 @@ type placerServer struct {
 	peers  api.Peers
 	server *http.Server
 	rn     *raft.Raft
-	db     *pebble.DB
+	db     *fsmdb.DB
 }
 
 func NewPlacer(c *PlacerConfig) api.Server { return &placerServer{config: c} }
@@ -64,7 +65,7 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	db, err := pebble.Open(s.config.WithDataDir(PlacerFSMDir), new(pebble.Options))
+	db, err := fsmdb.Open(s.config.WithDataDir(PlacerFSMDir), &pebble.Options{Logger: logs.Pebble()})
 	if err != nil {
 		return err
 	}
@@ -117,6 +118,7 @@ func (s *placerServer) Setup() error {
 			ServeMux(p).
 			HandleFunc(api.RpcMemberAskLeaderID, hyped.Provider(s.AskLeaderID)).
 			HandleFunc(api.RpcPlacerListGroups, hyped.LeaderProvider(s, s.ListGroups)).
+			HandleFunc(api.RpcPlacerGenerateGroup, hyped.LeaderProvider(s, s.GenerateGroup)).
 			Build(),
 		ErrorLog: logs.E,
 	}
@@ -126,5 +128,9 @@ func (s *placerServer) Setup() error {
 
 func (s *placerServer) ListenAndServe() error { return s.server.ListenAndServe() }
 func (s *placerServer) Shutdown(ctx context.Context) error {
-	return errors.Join(s.rn.Shutdown().Error(), s.server.Shutdown(ctx))
+	return errors.Join(
+		s.db.Close(),
+		s.rn.Shutdown().Error(),
+		s.server.Shutdown(ctx),
+	)
 }

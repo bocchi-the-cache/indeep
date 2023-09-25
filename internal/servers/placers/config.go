@@ -49,7 +49,7 @@ func DefaultPlacerConfig() *PlacerConfig {
 }
 
 func (c *PlacerConfig) hcLogger(name string) hclog.Logger {
-	return logs.HcLogger(fmt.Sprintf("%s-%s", c.ID, name))
+	return logs.HashiCorp(fmt.Sprintf("%s-%s", c.ID, name))
 }
 
 func (c *PlacerConfig) WithDataDir(elem ...string) string {

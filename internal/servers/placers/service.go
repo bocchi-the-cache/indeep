@@ -6,10 +6,12 @@ import (
 	"github.com/hashicorp/raft"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/utils"
 )
 
-const DBGroupPrefix = "G"
+const (
+	DBGroupPrefix  = "g"
+	DBGroupCounter = "counterGroup"
+)
 
 var _ = (api.Placer)((*placerServer)(nil))
 
@@ -20,19 +22,24 @@ func (s *placerServer) AskLeaderID() (*raft.ServerID, error) {
 
 func (s *placerServer) ListGroups() (*[]api.GroupID, error) {
 	var ret []api.GroupID
-	it, err := s.db.NewIter(utils.PrefixIterOptions(DBGroupPrefix))
+	it, err := s.db.NewPrefixIter(DBGroupPrefix)
 	if err != nil {
 		return nil, err
 	}
 	for it.First(); it.Valid(); it.Next() {
-		ret = append(ret, api.GroupID(it.Key()[len(DBGroupPrefix):]))
+		ret = append(ret, api.GroupID(it.Key()))
 	}
 	return &ret, nil
 }
 
 func (s *placerServer) GenerateGroup() (*api.GroupID, error) {
-	// TODO
-	panic("TODO")
+	n, err := s.db.Inc(DBGroupCounter)
+	if err != nil {
+		return nil, err
+	}
+	id := api.GroupID(fmt.Sprint(DBGroupPrefix, n))
+	// FIXME: Generate the group info too.
+	return &id, nil
 }
 
 func (s *placerServer) CheckLeader() error {

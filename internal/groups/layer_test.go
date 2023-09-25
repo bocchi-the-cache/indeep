@@ -33,11 +33,11 @@ func newBoltDB(t *testing.T, name string, id raft.ServerID) *raftboltdb.BoltStor
 func bootstrapNode(t *testing.T, s raft.StreamLayer, c raft.Configuration, id raft.ServerID) {
 	config := raft.DefaultConfig()
 	config.LocalID = id
-	snaps, err := raft.NewFileSnapshotStoreWithLogger(".", 3, logs.HcLogger("snaps"))
+	snaps, err := raft.NewFileSnapshotStoreWithLogger(".", 3, logs.HashiCorp("snaps"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	trans := raft.NewNetworkTransportWithLogger(s, 10, 15*time.Second, logs.HcLogger("trans"))
+	trans := raft.NewNetworkTransportWithLogger(s, 10, 15*time.Second, logs.HashiCorp("trans"))
 	r, err := raft.NewRaft(
 		config,
 		new(raft.MockFSM),
