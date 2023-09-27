@@ -6,7 +6,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v4"
+
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -22,7 +23,7 @@ var (
 
 	slogCore   = newCore("SLOG ")
 	hcCore     = newCore("HC ")
-	pebbleCore = newCore("PEBBLE ")
+	badgerCore = newCore("BADGER ")
 )
 
 func Logger(prefix string) *log.Logger {
@@ -37,15 +38,20 @@ func HashiCorp(name string) hclog.Logger {
 	return hclog.FromStandardLogger(hcCore, &hclog.LoggerOptions{Name: name, IncludeLocation: true})
 }
 
-type pebbleLog struct{ *log.Logger }
+type badgerLog struct{ *log.Logger }
 
-func (p *pebbleLog) Infof(format string, args ...interface{}) {
-	_ = p.Logger.Output(2, fmt.Sprintf(format, args...))
+func Badger() badger.Logger { return &badgerLog{Logger: badgerCore} }
+
+func (l *badgerLog) Errorf(f string, v ...interface{}) {
+	_ = l.Output(2, fmt.Sprintf("[ERRO] "+f, v...))
 }
 
-func (p *pebbleLog) Fatalf(format string, args ...interface{}) {
-	_ = p.Logger.Output(2, fmt.Sprintf(format, args...))
-	os.Exit(1)
+func (l *badgerLog) Warningf(f string, v ...interface{}) {
+	_ = l.Output(2, fmt.Sprintf("[WARN] "+f, v...))
 }
 
-func Pebble() pebble.Logger { return &pebbleLog{pebbleCore} }
+func (l *badgerLog) Infof(f string, v ...interface{}) {
+	_ = l.Output(2, fmt.Sprintf("[INFO] "+f, v...))
+}
+
+func (*badgerLog) Debugf(string, ...interface{}) {}

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
-	"github.com/bocchi-the-cache/indeep/internal/snapmetadb"
 )
 
 type placerServer struct {
@@ -65,7 +63,7 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	db, err := fsmdb.Open(s.config.WithDataDir(PlacerFSMDir), &pebble.Options{Logger: logs.Pebble()})
+	db, err := fsmdb.Open(s.config.DataDir)
 	if err != nil {
 		return err
 	}
@@ -100,12 +98,7 @@ func (s *placerServer) Setup() error {
 		return err
 	}
 
-	snapMetaDB, err := snapmetadb.Open(s.config.WithDataDir(PlacerSnapshotMetaDBFile))
-	if err != nil {
-		return err
-	}
-
-	rn, err := raft.NewRaft(config, s, cachedLogDB, stableDB, snapMetaDB, trans)
+	rn, err := raft.NewRaft(config, s, cachedLogDB, stableDB, s.db, trans)
 	if err != nil {
 		return err
 	}

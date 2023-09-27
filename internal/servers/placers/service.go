@@ -22,18 +22,15 @@ func (s *placerServer) AskLeaderID() (*raft.ServerID, error) {
 
 func (s *placerServer) ListGroups() (*[]api.GroupID, error) {
 	var ret []api.GroupID
-	it, err := s.db.NewPrefixIter(DBGroupPrefix)
-	if err != nil {
-		return nil, err
-	}
-	for it.First(); it.Valid(); it.Next() {
-		ret = append(ret, api.GroupID(it.Key()))
+	it := s.db.Iter([]byte(DBGroupPrefix), false)
+	for it.Rewind(); it.Valid(); it.Next() {
+		ret = append(ret, api.GroupID(it.Item().KeyCopy(nil)))
 	}
 	return &ret, nil
 }
 
 func (s *placerServer) GenerateGroup() (*api.GroupID, error) {
-	n, err := s.db.Inc(DBGroupCounter)
+	n, err := s.db.Inc([]byte(DBGroupCounter))
 	if err != nil {
 		return nil, err
 	}
