@@ -10,6 +10,7 @@ import (
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/logs"
+	"github.com/bocchi-the-cache/indeep/internal/tenants"
 )
 
 const (
@@ -18,9 +19,8 @@ const (
 	DefaultPlacerPeersConnPool  = 10
 	DefaultPlacerPeersIOTimeout = 15 * time.Second
 
-	PlacerLogDBFile          = "placer.log.bolt"
-	PlacerStableDBFile       = "placer.stable.bolt"
-	PlacerSnapshotMetaDBFile = "placer.snapmeta.bolt"
+	PlacerLogDBFile    = "placer.log.bolt"
+	PlacerStableDBFile = "placer.stable.bolt"
 )
 
 type PlacerConfig struct {
@@ -31,6 +31,9 @@ type PlacerConfig struct {
 	LogCacheCap    int
 	PeersConnPool  int
 	PeersIOTimeout time.Duration
+
+	// TODO: User-provided tenant store.
+	Tenants api.Tenants
 
 	rawPeers string
 }
@@ -44,6 +47,7 @@ func DefaultPlacerConfig() *PlacerConfig {
 		LogCacheCap:    DefaultPlacerLogCacheCap,
 		PeersConnPool:  DefaultPlacerPeersConnPool,
 		PeersIOTimeout: DefaultPlacerPeersIOTimeout,
+		Tenants:        tenants.New(),
 	}
 }
 
