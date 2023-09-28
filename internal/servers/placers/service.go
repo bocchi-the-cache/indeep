@@ -25,6 +25,7 @@ func (s *placerServer) ListGroups() (*[]api.GroupID, error) {
 	var ret []api.GroupID
 	if err := s.db.View(func(tx *fsmdb.Tx) error {
 		it := tx.Iter([]byte(DBGroupPrefix), false)
+		defer it.Close()
 		for it.Rewind(); it.Valid(); it.Next() {
 			ret = append(ret, api.GroupID(it.Item().KeyCopy(nil)))
 		}
@@ -43,8 +44,8 @@ func (s *placerServer) GenerateGroup() (*api.GroupID, error) {
 			return err
 		}
 		id = api.GroupID(fmt.Sprint(DBGroupPrefix, n))
-		// FIXME: Generate the group info too.
-		return nil
+		// TODO: group range information
+		return tx.Set([]byte(id), []byte("TODO"))
 	}); err != nil {
 		return nil, err
 	}
