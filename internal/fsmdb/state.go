@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bocchi-the-cache/indeep/internal/logs"
-
 	"github.com/dgraph-io/badger/v4"
+
+	"github.com/bocchi-the-cache/indeep/internal/logs"
 )
 
 const StateDir = "states"
@@ -43,8 +43,27 @@ func Open(dataDir string) (*DB, error) {
 	return fsmDB, nil
 }
 
-func (d *DB) Iter(prefix []byte, withValues bool) *badger.Iterator {
-	tx := d.NewTransaction(false)
+func (d *DB) View(f func(tx *Tx) error) error {
+	tx := &Tx{Txn: d.NewTransaction(false), bin: d.bin}
+	defer tx.Discard()
+	return f(tx)
+}
+
+func (d *DB) Update(f func(tx *Tx) error) error {
+	tx := &Tx{Txn: d.NewTransaction(true), bin: d.bin}
+	defer tx.Discard()
+	if err := f(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+type Tx struct {
+	*badger.Txn
+	bin binary.ByteOrder
+}
+
+func (tx *Tx) Iter(prefix []byte, withValues bool) *badger.Iterator {
 	opt := badger.IteratorOptions{Prefix: prefix}
 	if withValues {
 		opt.PrefetchValues = true
@@ -53,8 +72,8 @@ func (d *DB) Iter(prefix []byte, withValues bool) *badger.Iterator {
 	return tx.NewIterator(opt)
 }
 
-func (d *DB) Uint64(key, dst []byte) (uint64, error) {
-	item, err := d.NewTransaction(false).Get(key)
+func (tx *Tx) Uint64(key, dst []byte) (uint64, error) {
+	item, err := tx.Get(key)
 	if errors.Is(err, badger.ErrKeyNotFound) {
 		return 0, nil
 	}
@@ -67,25 +86,18 @@ func (d *DB) Uint64(key, dst []byte) (uint64, error) {
 		return 0, err
 	}
 
-	return d.bin.Uint64(data), nil
+	return tx.bin.Uint64(data), nil
 }
 
-func (d *DB) Inc(key []byte) (old uint64, err error) {
+func (tx *Tx) Inc(key []byte) (old uint64, err error) {
 	dst := make([]byte, 8)
 
-	old, err = d.Uint64(key, dst)
+	old, err = tx.Uint64(key, dst)
 	if err != nil {
 		return
 	}
-	d.bin.PutUint64(dst, old+1)
+	tx.bin.PutUint64(dst, old+1)
 
-	tx := d.NewTransaction(true)
-	if err = tx.Set(key, dst); err != nil {
-		return
-	}
-	if err = tx.Commit(); err != nil {
-		return
-	}
-
+	err = tx.Set(key, dst)
 	return
 }

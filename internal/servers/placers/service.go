@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/raft"
 
 	"github.com/bocchi-the-cache/indeep/api"
+	"github.com/bocchi-the-cache/indeep/internal/fsmdb"
 )
 
 const (
@@ -22,20 +23,31 @@ func (s *placerServer) AskLeaderID() (*raft.ServerID, error) {
 
 func (s *placerServer) ListGroups() (*[]api.GroupID, error) {
 	var ret []api.GroupID
-	it := s.db.Iter([]byte(DBGroupPrefix), false)
-	for it.Rewind(); it.Valid(); it.Next() {
-		ret = append(ret, api.GroupID(it.Item().KeyCopy(nil)))
+	if err := s.db.View(func(tx *fsmdb.Tx) error {
+		it := tx.Iter([]byte(DBGroupPrefix), false)
+		for it.Rewind(); it.Valid(); it.Next() {
+			ret = append(ret, api.GroupID(it.Item().KeyCopy(nil)))
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return &ret, nil
 }
 
 func (s *placerServer) GenerateGroup() (*api.GroupID, error) {
-	n, err := s.db.Inc([]byte(DBGroupCounter))
-	if err != nil {
+	var id api.GroupID
+	if err := s.db.Update(func(tx *fsmdb.Tx) error {
+		n, err := tx.Inc([]byte(DBGroupCounter))
+		if err != nil {
+			return err
+		}
+		id = api.GroupID(fmt.Sprint(DBGroupPrefix, n))
+		// FIXME: Generate the group info too.
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	id := api.GroupID(fmt.Sprint(DBGroupPrefix, n))
-	// FIXME: Generate the group info too.
 	return &id, nil
 }
 
