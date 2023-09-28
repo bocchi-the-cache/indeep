@@ -3,6 +3,7 @@ package fsmdb
 import (
 	"encoding/binary"
 	"errors"
+	"os"
 	"path/filepath"
 
 	"github.com/bocchi-the-cache/indeep/internal/logs"
@@ -19,13 +20,27 @@ type DB struct {
 }
 
 func Open(dataDir string) (*DB, error) {
-	opts := badger.DefaultOptions(filepath.Join(dataDir, StateDir))
+	fsmDB := &DB{dataDir: dataDir, bin: binary.LittleEndian}
+
+	stateDir := filepath.Join(dataDir, StateDir)
+	if err := os.MkdirAll(stateDir, 0755); err != nil {
+		return nil, err
+	}
+	snapDir := fsmDB.snapDir()
+	if err := os.MkdirAll(snapDir, 0755); err != nil {
+		return nil, err
+	}
+
+	opts := badger.DefaultOptions(stateDir)
 	opts.Logger = logs.Badger()
+
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
 	}
-	return &DB{DB: db, dataDir: dataDir, bin: binary.LittleEndian}, nil
+	fsmDB.DB = db
+
+	return fsmDB, nil
 }
 
 func (d *DB) Iter(prefix []byte, withValues bool) *badger.Iterator {

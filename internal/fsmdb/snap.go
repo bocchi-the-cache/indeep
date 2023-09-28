@@ -34,10 +34,6 @@ func (d *DB) Create(
 	configurationIndex uint64,
 	_ raft.Transport,
 ) (raft.SnapshotSink, error) {
-	if err := os.MkdirAll(d.snapDir(), 0755); err != nil {
-		return nil, err
-	}
-
 	id := SnapshotID(index)
 	data, err := json.Marshal(&raft.SnapshotMeta{
 		Version:            version,
