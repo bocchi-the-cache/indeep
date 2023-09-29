@@ -79,7 +79,7 @@ func (m *metaserver) Setup() error {
 	m.server = &http.Server{
 		Addr:     m.config.Host,
 		Handler:  mux,
-		ErrorLog: logs.E,
+		ErrorLog: logs.Std,
 	}
 
 	return nil

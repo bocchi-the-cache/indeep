@@ -113,7 +113,7 @@ func (s *placerServer) Setup() error {
 			HandleFunc(api.RpcPlacerListGroups, hyped.LeaderProvider(s, s.ListGroups)).
 			HandleFunc(api.RpcPlacerGenerateGroup, hyped.LeaderProvider(s, s.GenerateGroup)).
 			Build(),
-		ErrorLog: logs.E,
+		ErrorLog: logs.Std,
 	}
 
 	return nil

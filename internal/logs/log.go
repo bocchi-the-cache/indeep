@@ -22,8 +22,8 @@ var (
 	hcCore     = basic("HC ")
 	badgerCore = shortFile("BADGER ")
 
-	E = shortFile("ERR ")
-	S = Structured()
+	Std = shortFile("STD ")
+	S   = Structured()
 )
 
 func Structured() *slog.Logger {

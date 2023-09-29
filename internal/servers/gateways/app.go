@@ -47,7 +47,7 @@ func (g *gateway) Setup() error {
 	g.server = &http.Server{
 		Addr:     g.config.Host,
 		Handler:  mux,
-		ErrorLog: logs.E,
+		ErrorLog: logs.Std,
 	}
 
 	return nil
