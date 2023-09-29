@@ -47,12 +47,9 @@ func (m *metaserver) Setup() error {
 	}
 	m.peers = ps
 
-	p, err := m.peers.Lookup(m.config.ID)
-	if err != nil {
+	if _, err := m.peers.Lookup(m.config.ID); err != nil {
 		return err
 	}
-	// TODO: ServeMux would use this.
-	_ = p
 
 	if m.config.rawPlacerHosts != "" {
 		ps, err := api.ParseAddressMap(m.config.rawPlacerHosts)
@@ -66,23 +63,6 @@ func (m *metaserver) Setup() error {
 		return err
 	}
 	m.placerCl = placerCl
-
-	if err := m.setupGroups(); err != nil {
-		return err
-	}
-
-	// TODO
-
-	return nil
-}
-
-func (m *metaserver) setupGroups() error {
-	groups, err := m.placerCl.ListGroups()
-	if err != nil {
-		return err
-	}
-	// TODO
-	_ = groups
 
 	return nil
 }
