@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-const flags = log.LstdFlags | log.Lmicroseconds | log.Lmsgprefix
+const flags = log.LstdFlags | log.Lmicroseconds
 
 func basic(prefix string) *log.Logger     { return log.New(out, prefix, flags) }
 func shortFile(prefix string) *log.Logger { return log.New(out, prefix, flags|log.Lshortfile) }
