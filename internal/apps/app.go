@@ -30,9 +30,13 @@ func RunServer(s api.Server, args []string) {
 		os.Exit(1)
 	}
 
+	mux := new(http.ServeMux)
+	s.DefineMux(mux)
+	server := http.Server{Addr: s.Host(), Handler: mux, ErrorLog: logs.Std}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		if err := s.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			logs.S.Error("listen error", "err", err)
 		}
 		cancel()
@@ -42,8 +46,12 @@ func RunServer(s api.Server, args []string) {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 
-	if err := s.Shutdown(context.Background()); err != nil {
-		logs.S.Error("shutdown error", "err", err)
+	if err := server.Shutdown(context.Background()); err != nil {
+		logs.S.Error("server shutdown error", "err", err)
 	}
 	<-ctx.Done()
+
+	if err := s.Close(); err != nil {
+		logs.S.Error("server close error", "err", err)
+	}
 }

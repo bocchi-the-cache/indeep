@@ -1,13 +1,11 @@
 package metaservers
 
 import (
-	"context"
 	"flag"
 	"net/http"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
-	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
@@ -74,13 +72,6 @@ func (m *metaserver) Setup() error {
 	}
 
 	// TODO
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
-	m.server = &http.Server{
-		Addr:     m.config.Host,
-		Handler:  mux,
-		ErrorLog: logs.Std,
-	}
 
 	return nil
 }
@@ -96,5 +87,10 @@ func (m *metaserver) setupGroups() error {
 	return nil
 }
 
-func (m *metaserver) ListenAndServe() error              { return m.server.ListenAndServe() }
-func (m *metaserver) Shutdown(ctx context.Context) error { return m.server.Shutdown(ctx) }
+func (m *metaserver) Host() string { return m.config.Host }
+
+func (m *metaserver) DefineMux(mux *http.ServeMux) {
+	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
+}
+
+func (m *metaserver) Close() error { return nil }

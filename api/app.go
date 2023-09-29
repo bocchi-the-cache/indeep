@@ -1,8 +1,9 @@
 package api
 
 import (
-	"context"
 	"flag"
+	"io"
+	"net/http"
 )
 
 type App interface {
@@ -14,6 +15,7 @@ type App interface {
 type Server interface {
 	App
 
-	ListenAndServe() error
-	Shutdown(ctx context.Context) error
+	io.Closer
+	Host() string
+	DefineMux(mux *http.ServeMux)
 }

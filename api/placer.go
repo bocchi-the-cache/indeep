@@ -5,8 +5,8 @@ const (
 	DefaultPlacerHost = "127.0.0.1:11551"
 	DefaultPlacerPeer = "127.0.0.1:11561"
 
-	RpcPlacerListGroups    = "list-groups"
-	RpcPlacerGenerateGroup = "generate-group"
+	RpcPlacerListGroups    RpcID = "list-groups"
+	RpcPlacerGenerateGroup RpcID = "generate-group"
 )
 
 var (

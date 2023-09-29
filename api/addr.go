@@ -25,6 +25,8 @@ var (
 
 type RpcID string
 
+func (id RpcID) Path() string { return RootPath + string(id) }
+
 type Addresser interface {
 	Address() *Address
 }
@@ -42,7 +44,7 @@ func NewAddress(scheme, host string) *Address {
 }
 
 func (a *Address) RPC(id RpcID) *Address {
-	return &Address{&url.URL{Scheme: a.Scheme, Host: a.Host, Path: RootPath + string(id)}}
+	return &Address{&url.URL{Scheme: a.Scheme, Host: a.Host, Path: id.Path()}}
 }
 
 func (a *Address) MarshalJSON() ([]byte, error) { return json.Marshal(a.String()) }

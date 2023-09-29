@@ -1,7 +1,6 @@
 package placers
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"net/http"
@@ -13,7 +12,6 @@ import (
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/fsmdb"
 	"github.com/bocchi-the-cache/indeep/internal/hyped"
-	"github.com/bocchi-the-cache/indeep/internal/logs"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
 )
 
@@ -105,25 +103,17 @@ func (s *placerServer) Setup() error {
 	s.rn = rn
 	s.rn.BootstrapCluster(s.peers.Configuration())
 
-	s.server = &http.Server{
-		Addr: s.config.Host,
-		Handler: peers.
-			ServeMux(p).
-			HandleFunc(api.RpcMemberAskLeaderID, hyped.Provider(s.AskLeaderID)).
-			HandleFunc(api.RpcPlacerListGroups, hyped.LeaderProvider(s, s.ListGroups)).
-			HandleFunc(api.RpcPlacerGenerateGroup, hyped.LeaderProvider(s, s.GenerateGroup)).
-			Build(),
-		ErrorLog: logs.Std,
-	}
-
 	return nil
 }
 
-func (s *placerServer) ListenAndServe() error { return s.server.ListenAndServe() }
-func (s *placerServer) Shutdown(ctx context.Context) error {
-	return errors.Join(
-		s.db.Close(),
-		s.rn.Shutdown().Error(),
-		s.server.Shutdown(ctx),
-	)
+func (s *placerServer) Host() string { return s.config.Host }
+
+func (s *placerServer) DefineMux(mux *http.ServeMux) {
+	mux.HandleFunc(api.RpcMemberAskLeaderID.Path(), hyped.Provider(s.AskLeaderID))
+	mux.HandleFunc(api.RpcPlacerListGroups.Path(), hyped.LeaderProvider(s, s.ListGroups))
+	mux.HandleFunc(api.RpcPlacerGenerateGroup.Path(), hyped.LeaderProvider(s, s.GenerateGroup))
+}
+
+func (s *placerServer) Close() error {
+	return errors.Join(s.db.Close(), s.rn.Shutdown().Error())
 }

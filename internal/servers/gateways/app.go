@@ -6,7 +6,6 @@ import (
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
-	"github.com/bocchi-the-cache/indeep/internal/logs"
 )
 
 type gateway struct {
@@ -41,14 +40,13 @@ func (g *gateway) Setup() error {
 	}
 	g.placerCl = placerCl
 
-	// TODO
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
-	g.server = &http.Server{
-		Addr:     g.config.Host,
-		Handler:  mux,
-		ErrorLog: logs.Std,
-	}
-
 	return nil
 }
+
+func (g *gateway) Host() string { return g.config.Host }
+
+func (g *gateway) DefineMux(mux *http.ServeMux) {
+	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
+}
+
+func (g *gateway) Close() error { return nil }

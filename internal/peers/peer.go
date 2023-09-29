@@ -3,7 +3,6 @@ package peers
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/raft"
 
@@ -79,24 +78,3 @@ func (p *peer) UnmarshalJSON(bytes []byte) error {
 	p.addr = info.Address
 	return nil
 }
-
-type (
-	PeerServeMux interface {
-		HandleFunc(rpc api.RpcID, f http.HandlerFunc) PeerServeMux
-		Build() *http.ServeMux
-	}
-
-	peerServeMux struct {
-		p api.Peer
-		m *http.ServeMux
-	}
-)
-
-func ServeMux(p api.Peer) PeerServeMux { return &peerServeMux{p: p, m: http.NewServeMux()} }
-
-func (s *peerServeMux) HandleFunc(rpc api.RpcID, f http.HandlerFunc) PeerServeMux {
-	s.m.HandleFunc(s.p.Address().RPC(rpc).Path, f)
-	return s
-}
-
-func (s *peerServeMux) Build() *http.ServeMux { return s.m }
