@@ -12,6 +12,7 @@ import (
 )
 
 type gateway struct {
+	api.S3Mux
 	config   *GatewayConfig
 	codec    hyped.Codec
 	sigChk   api.SigChecker
@@ -24,6 +25,7 @@ type gateway struct {
 func NewGateway(c *GatewayConfig) api.Server {
 	codec := hyped.XML()
 	return &gateway{
+		S3Mux:  awsutl.S3Mux(),
 		config: c,
 		codec:  codec,
 		sigChk: awsutl.SigChecker(tenants.New(), codec),
@@ -53,13 +55,15 @@ func (g *gateway) Setup() error {
 	}
 	g.placerCl = placerCl
 
+	g.defineMux()
+
 	return nil
 }
 
 func (g *gateway) Host() string { return g.config.Host }
 
-func (g *gateway) DefineMux(mux *http.ServeMux) {
-	mux.HandleFunc("/", g.sigChk.WithSigV4(hyped.ProviderWith(g.codec, g.ListBuckets)))
+func (g *gateway) defineMux() {
+	g.S3Mux.HandleFunc(api.ListBucketsID, g.sigChk.WithSigV4(hyped.ProviderWith(g.codec, g.ListBuckets)))
 }
 
 func (g *gateway) Close() error { return nil }
