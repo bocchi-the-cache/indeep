@@ -6,8 +6,8 @@ import (
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
-	"github.com/bocchi-the-cache/indeep/internal/sigv4"
 	"github.com/bocchi-the-cache/indeep/internal/tenants"
+	"github.com/bocchi-the-cache/indeep/internal/utils/awsutl"
 	"github.com/bocchi-the-cache/indeep/internal/utils/hyped"
 )
 
@@ -26,7 +26,7 @@ func NewGateway(c *GatewayConfig) api.Server {
 	return &gateway{
 		config: c,
 		codec:  codec,
-		sigChk: sigv4.New(tenants.New(), codec),
+		sigChk: awsutl.NewSigV4Checker(tenants.New(), codec),
 	}
 }
 

@@ -1,4 +1,4 @@
-package sigv4
+package awsutl
 
 import (
 	"crypto/hmac"
@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/utils/awsutl"
 	"github.com/bocchi-the-cache/indeep/internal/utils/hyped"
 )
 
@@ -23,10 +22,12 @@ type checker struct {
 	codec   hyped.Codec
 }
 
-func New(tenants api.Tenants, codec hyped.Codec) api.SigChecker { return &checker{tenants, codec} }
+func NewSigV4Checker(tenants api.Tenants, codec hyped.Codec) api.SigChecker {
+	return &checker{tenants, codec}
+}
 
 func (c *checker) CheckSigV4(r *http.Request) (bool, error) {
-	auth, err := awsutl.NewAuthorization(r)
+	auth, err := NewAuthorization(r)
 	if err != nil {
 		return false, err
 	}
@@ -69,7 +70,7 @@ func (c *checker) CheckSigV4(r *http.Request) (bool, error) {
 	date := auth.Credential.Date
 	stringToSign := strings.Join(
 		[]string{
-			awsutl.AuthScheme,
+			AuthScheme,
 			r.Header.Get(TimeKey),
 			strings.Join(
 				[]string{
@@ -106,11 +107,11 @@ func (c *checker) WithSigV4(f http.HandlerFunc) http.HandlerFunc {
 		ctx := hyped.NewContext(c.codec, w, r)
 		ok, err := c.CheckSigV4(r)
 		if err != nil {
-			ctx.Err(&awsutl.Error{Status: status, Message: err.Error()})
+			ctx.Err(&Error{Status: status, Message: err.Error()})
 			return
 		}
 		if !ok {
-			ctx.Err(&awsutl.Error{Status: status, Message: "signature not matched"})
+			ctx.Err(&Error{Status: status, Message: "signature not matched"})
 			return
 		}
 		f(w, r)
