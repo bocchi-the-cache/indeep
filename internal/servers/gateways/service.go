@@ -4,7 +4,7 @@ import "github.com/bocchi-the-cache/indeep/api"
 
 var _ = (api.Gateway)((*gateway)(nil))
 
-func (g *gateway) ListBuckets() (*[]string, error) {
+func (g *gateway) ListBuckets() (*api.ListAllMyBucketsResult, error) {
 	// TODO
-	return nil, nil
+	return new(api.ListAllMyBucketsResult), nil
 }

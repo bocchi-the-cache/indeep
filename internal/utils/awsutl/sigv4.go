@@ -32,7 +32,7 @@ func (c *checker) CheckSigV4(r *http.Request) (bool, error) {
 		return false, err
 	}
 
-	sk, err := c.tenants.SecretKey(auth.Credential.AccessKey)
+	tenant, err := c.tenants.Get(auth.Credential.AccessKey)
 	if err != nil {
 		return false, err
 	}
@@ -72,7 +72,7 @@ func (c *checker) CheckSigV4(r *http.Request) (bool, error) {
 		"\n",
 	)
 
-	dateKey := hmacSHA256([]byte(SigningDateKeyPrefix+string(sk)), date)
+	dateKey := hmacSHA256([]byte(SigningDateKeyPrefix+string(tenant.SecretKey)), date)
 	dateRegionKey := hmacSHA256(dateKey, auth.Credential.Region)
 	dateRegionServiceKey := hmacSHA256(dateRegionKey, auth.Credential.Service)
 	signingKey := hmacSHA256(dateRegionServiceKey, auth.Credential.Suffix)

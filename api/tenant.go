@@ -5,7 +5,15 @@ type (
 	SecretKey string
 )
 
-type Tenants interface {
-	SecretKey(ak AccessKey) (SecretKey, error)
-	ListAll() ([]AccessKey, error)
-}
+type (
+	Tenant struct {
+		DisplayName string
+		AccessKey   AccessKey
+		SecretKey   SecretKey
+	}
+
+	Tenants interface {
+		Get(ak AccessKey) (*Tenant, error)
+		ListAll() ([]AccessKey, error)
+	}
+)

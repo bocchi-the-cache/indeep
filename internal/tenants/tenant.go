@@ -5,12 +5,21 @@ import (
 )
 
 const (
-	DefaultAccessKey = "root"
-	DefaultSecretKey = "secret"
+	DefaultDisplayName = "Admin"
+	DefaultAccessKey   = "root"
+	DefaultSecretKey   = "secret"
 )
 
 type tenants struct{}
 
-func New() api.Tenants                                          { return new(tenants) }
-func (*tenants) SecretKey(api.AccessKey) (api.SecretKey, error) { return DefaultSecretKey, nil }
-func (*tenants) ListAll() ([]api.AccessKey, error)              { return []api.AccessKey{DefaultAccessKey}, nil }
+func New() api.Tenants { return new(tenants) }
+
+func (*tenants) Get(api.AccessKey) (*api.Tenant, error) {
+	return &api.Tenant{
+		DisplayName: DefaultDisplayName,
+		AccessKey:   DefaultAccessKey,
+		SecretKey:   DefaultSecretKey,
+	}, nil
+}
+
+func (*tenants) ListAll() ([]api.AccessKey, error) { return []api.AccessKey{DefaultAccessKey}, nil }
