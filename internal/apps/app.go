@@ -30,9 +30,16 @@ func RunServer(s api.Server, args []string) {
 		os.Exit(1)
 	}
 
-	mux := new(http.ServeMux)
-	s.DefineMux(mux)
-	server := http.Server{Addr: s.Host(), Handler: mux, ErrorLog: logs.Std}
+	var handler http.Handler
+	if definer, ok := s.(api.MuxDefiner); ok {
+		mux := new(http.ServeMux)
+		definer.DefineMux(mux)
+		handler = mux
+	}
+	if h, ok := s.(http.Handler); ok {
+		handler = h
+	}
+	server := http.Server{Addr: s.Host(), Handler: handler, ErrorLog: logs.Std}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {

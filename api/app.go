@@ -17,5 +17,8 @@ type Server interface {
 
 	io.Closer
 	Host() string
+}
+
+type MuxDefiner interface {
 	DefineMux(mux *http.ServeMux)
 }
