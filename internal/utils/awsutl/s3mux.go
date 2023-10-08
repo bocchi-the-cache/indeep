@@ -16,12 +16,11 @@ func S3Mux() api.S3Mux { return new(s3mux) }
 func (s *s3mux) HandleFunc(id api.S3ApiID, f http.HandlerFunc) { s.handlers[id] = f }
 
 func (s *s3mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	id, ok := s.parseApiID(r)
-	if !ok {
-		w.WriteHeader(http.StatusNotImplemented)
+	if id, ok := s.parseApiID(r); ok {
+		s.handlers[id].ServeHTTP(w, r)
 		return
 	}
-	s.handlers[id].ServeHTTP(w, r)
+	w.WriteHeader(http.StatusNotImplemented)
 }
 
 func (s *s3mux) parseApiID(r *http.Request) (api.S3ApiID, bool) {
