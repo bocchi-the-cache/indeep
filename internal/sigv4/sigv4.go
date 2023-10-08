@@ -1,84 +1,93 @@
 package sigv4
 
 import (
-	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
-	"time"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	sigv4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"strings"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/awsutl"
-	"github.com/bocchi-the-cache/indeep/internal/httputl"
 )
 
 const (
-	AuthScheme = "AWS4-HMAC-SHA256"
-
-	ContentHashKey = "X-Amz-Content-Sha256"
-	TimeKey        = "X-Amz-Date"
-	TimeFormat     = "20060102T150405Z"
+	TimeKey              = "X-Amz-Date"
+	SigningDateKeyPrefix = "AWS4"
 )
-
-type Input struct {
-	Auth        *awsutl.Authorization
-	Credentials aws.Credentials
-	ContentHash string
-	Time        time.Time
-}
-
-func NewInput(tenants api.Tenants, r *http.Request) (*Input, error) {
-	auth, err := httputl.NewAuthorization(r)
-	if err != nil {
-		return nil, err
-	}
-	if s := auth.Scheme; s != AuthScheme {
-		return nil, fmt.Errorf("%w: scheme=%s", api.ErrUnknownAuthScheme, s)
-	}
-	awsAuth, err := awsutl.NewAuthorization(auth)
-	if err != nil {
-		return nil, err
-	}
-
-	sk, err := tenants.SecretKey(awsAuth.Credential.AccessKey)
-	if err != nil {
-		return nil, err
-	}
-
-	t, err := time.Parse(TimeFormat, r.Header.Get(TimeKey))
-	if err != nil {
-		return nil, err
-	}
-
-	return &Input{
-		Auth: awsAuth,
-		Credentials: aws.Credentials{
-			AccessKeyID:     string(awsAuth.Credential.AccessKey),
-			SecretAccessKey: string(sk),
-		},
-		ContentHash: r.Header.Get(ContentHashKey),
-		Time:        t,
-	}, nil
-}
 
 type checker struct{ tenants api.Tenants }
 
-func New(tenants api.Tenants) api.SigV4Checker { return &checker{tenants} }
+func New(tenants api.Tenants) api.SigChecker { return &checker{tenants} }
 
-func (c *checker) CheckSigV4(r *http.Request) error {
-	input, err := NewInput(c.tenants, r)
+func (c *checker) CheckSigV4(r *http.Request) (bool, error) {
+	auth, err := awsutl.NewAuthorization(r)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return sigv4.NewSigner().SignHTTP(
-		context.Background(),
-		input.Credentials,
-		r,
-		input.ContentHash,
-		input.Auth.Credential.Service,
-		input.Auth.Credential.Region,
-		input.Time,
+
+	sk, err := c.tenants.SecretKey(auth.Credential.AccessKey)
+	if err != nil {
+		return false, err
+	}
+
+	var canonicalHeaderList []string
+	for _, key := range auth.SignedHeaders {
+		canonicalHeaderList = append(
+			canonicalHeaderList,
+			fmt.Sprintf("%s:%s\n", key, strings.TrimSpace(r.Header.Get(key))),
+		)
+	}
+	canonicalHeaders := strings.Join(canonicalHeaderList, "")
+
+	canonicalRequest := strings.Join(
+		[]string{
+			r.Method,
+			r.URL.Path,
+			r.URL.RawQuery,
+			canonicalHeaders,
+			strings.Join(auth.SignedHeaders, ":"),
+			auth.ContentHash,
+		},
+		"\n",
 	)
+	h := sha256.New()
+	if _, err := h.Write([]byte(canonicalRequest)); err != nil {
+		return false, err
+	}
+	hashedCanonicalRequest := hex.EncodeToString(h.Sum(nil))
+
+	date := auth.Credential.Date
+	stringToSign := strings.Join(
+		[]string{
+			awsutl.AuthScheme,
+			r.Header.Get(TimeKey),
+			strings.Join(
+				[]string{
+					date,
+					auth.Credential.Region,
+					auth.Credential.Service,
+					auth.Credential.Suffix,
+				},
+				"/",
+			),
+			hashedCanonicalRequest,
+		},
+		"\n",
+	)
+
+	dateKey := hmacSHA256([]byte(SigningDateKeyPrefix+string(sk)), date)
+	dateRegionKey := hmacSHA256(dateKey, auth.Credential.Region)
+	dateRegionServiceKey := hmacSHA256(dateRegionKey, auth.Credential.Service)
+	signingKey := hmacSHA256(dateRegionServiceKey, auth.Credential.Suffix)
+	sig := hex.EncodeToString(hmacSHA256(signingKey, stringToSign))
+
+	return sig == auth.Signature, nil
+}
+
+func hmacSHA256(key []byte, data string) []byte {
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(data))
+	return h.Sum(nil)
 }

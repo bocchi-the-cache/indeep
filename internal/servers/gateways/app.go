@@ -6,18 +6,30 @@ import (
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
+	"github.com/bocchi-the-cache/indeep/internal/hyped"
+	"github.com/bocchi-the-cache/indeep/internal/sigv4"
+	"github.com/bocchi-the-cache/indeep/internal/tenants"
 )
 
 type gateway struct {
 	config   *GatewayConfig
+	codec    hyped.Codec
+	sigChk   api.SigChecker
 	server   *http.Server
 	placerCl api.Placer
 	metaCl   api.MetaService
 	dataCl   api.DataService
 }
 
-func NewGateway(c *GatewayConfig) api.Server { return &gateway{config: c} }
-func Gateway() api.Server                    { return NewGateway(DefaultGatewayConfig()) }
+func NewGateway(c *GatewayConfig) api.Server {
+	return &gateway{
+		config: c,
+		codec:  hyped.XML(),
+		sigChk: sigv4.New(tenants.New()),
+	}
+}
+
+func Gateway() api.Server { return NewGateway(DefaultGatewayConfig()) }
 
 func (*gateway) Name() string { return "gateway" }
 
@@ -42,3 +54,11 @@ func (g *gateway) Setup() error {
 
 	return nil
 }
+
+func (g *gateway) Host() string { return g.config.Host }
+
+func (g *gateway) DefineMux(mux *http.ServeMux) {
+	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
+}
+
+func (g *gateway) Close() error { return nil }

@@ -9,14 +9,14 @@ import (
 const AuthorizationKey = "Authorization"
 
 var (
-	ErrEmptyAuthorization = errors.New("empty authorization")
-	ErrEmptyCredential    = errors.New("empty credential")
+	ErrEmptyAuthorization = errors.New("empty header authorization")
+	ErrEmptyCredential    = errors.New("empty header credential")
 )
 
 type Authorization struct{ Scheme, Credential string }
 
-func NewAuthorization(r *http.Request) (*Authorization, error) {
-	raw := r.Header.Get(AuthorizationKey)
+func NewAuthorization(header http.Header) (*Authorization, error) {
+	raw := header.Get(AuthorizationKey)
 	if len(raw) == 0 {
 		return nil, ErrEmptyAuthorization
 	}

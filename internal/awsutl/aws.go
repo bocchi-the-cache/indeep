@@ -3,27 +3,40 @@ package awsutl
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
-	"time"
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/httputl"
 )
 
 const (
-	ShortTimeFormat = "20060102"
+	AlgorithmKey = "X-Amz-Algorithm"
+	AuthScheme   = "AWS4-HMAC-SHA256"
 
-	CredentialEntryKey    = "Credential"
+	ContentHashKey   = "X-Amz-Content-Sha256"
+	EmptyContentHash = "UNSIGNED-PAYLOAD"
+
+	QueryPrefix = "X-Amz-"
+
+	CredentialEntryKey = "Credential"
+	CredentialQueryKey = QueryPrefix + CredentialEntryKey
+
 	SignedHeadersEntryKey = "SignedHeaders"
-	SignatureEntryKey     = "Signature"
+	SignedHeadersQueryKey = QueryPrefix + SignedHeadersEntryKey
+
+	SignatureEntryKey = "Signature"
+	SignatureQueryKey = QueryPrefix + SignatureEntryKey
 )
 
 var (
+	ErrUnknownAuthScheme          = errors.New("unknown authorization scheme")
 	ErrEmptyCredential            = errors.New("empty AWS credential")
 	ErrEmptySignedHeaders         = errors.New("empty AWS signed headers")
 	ErrEmptySignature             = errors.New("empty AWS signature")
+	ErrEmptyContentHash           = errors.New("empty AWS content hash")
 	ErrIncompleteCredentialFields = errors.New("incomplete AWS credential fields")
-	ErrCredentialParseTime        = errors.New("parse AWS credential time error")
 )
 
 type Authorization struct {
@@ -31,10 +44,55 @@ type Authorization struct {
 	Credential    *Credential
 	SignedHeaders []string
 	Signature     string
+	ContentHash   string
 }
 
-func NewAuthorization(a *httputl.Authorization) (*Authorization, error) {
-	ret := &Authorization{Scheme: a.Scheme}
+func NewAuthorization(r *http.Request) (*Authorization, error) {
+	auth, err := newAuthorization(r)
+	if err != nil {
+		return nil, err
+	}
+	var errs []error
+	if auth.Credential == nil {
+		errs = append(errs, ErrEmptyCredential)
+	}
+	if auth.SignedHeaders == nil {
+		errs = append(errs, ErrEmptySignedHeaders)
+	}
+	if auth.Signature == "" {
+		errs = append(errs, ErrEmptySignature)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	return auth, nil
+}
+
+func newAuthorization(r *http.Request) (*Authorization, error) {
+	if query := r.URL.Query(); query.Get(AlgorithmKey) == AuthScheme {
+		return newQueryAuthorization(query)
+	}
+
+	httpAuth, err := httputl.NewAuthorization(r.Header)
+	if err != nil {
+		return nil, err
+	}
+	auth, err := newHeaderAuthorization(httpAuth)
+	if err != nil {
+		return nil, err
+	}
+
+	contentHash := r.Header.Get(ContentHashKey)
+	if contentHash == "" {
+		return nil, ErrEmptyContentHash
+	}
+	auth.ContentHash = contentHash
+
+	return auth, nil
+}
+
+func newHeaderAuthorization(a *httputl.Authorization) (*Authorization, error) {
+	auth := &Authorization{Scheme: a.Scheme}
 	for _, rawEntry := range strings.Split(a.Credential, ",") {
 		entryItems := strings.SplitN(rawEntry, "=", 2)
 		if len(entryItems) != 2 {
@@ -48,28 +106,36 @@ func NewAuthorization(a *httputl.Authorization) (*Authorization, error) {
 			if err != nil {
 				return nil, err
 			}
-			ret.Credential = cred
+			auth.Credential = cred
 		case SignedHeadersEntryKey:
-			ret.SignedHeaders = strings.Split(value, ";")
+			auth.SignedHeaders = strings.Split(strings.ToLower(value), ";")
 		case SignatureEntryKey:
-			ret.Signature = value
+			auth.Signature = value
 		}
 	}
-	if ret.Credential == nil {
-		return nil, ErrEmptyCredential
+	if s := auth.Scheme; s != AuthScheme {
+		return nil, fmt.Errorf("%w: scheme=%s", ErrUnknownAuthScheme, s)
 	}
-	if ret.SignedHeaders == nil {
-		return nil, ErrEmptySignedHeaders
+	return auth, nil
+}
+
+func newQueryAuthorization(query url.Values) (*Authorization, error) {
+	cred, err := NewCredential(query.Get(CredentialQueryKey))
+	if err != nil {
+		return nil, err
 	}
-	if ret.Signature == "" {
-		return nil, ErrEmptySignature
-	}
-	return ret, nil
+	return &Authorization{
+		Scheme:        AuthScheme,
+		Credential:    cred,
+		SignedHeaders: strings.Split(query.Get(SignedHeadersQueryKey), ":"),
+		Signature:     query.Get(SignatureQueryKey),
+		ContentHash:   EmptyContentHash,
+	}, nil
 }
 
 type Credential struct {
 	AccessKey api.AccessKey
-	Date      time.Time
+	Date      string
 	Region    string
 	Service   string
 	Suffix    string
@@ -81,16 +147,9 @@ func NewCredential(raw string) (*Credential, error) {
 	if l := len(fields); l != fieldsN {
 		return nil, fmt.Errorf("%w: len=%d", ErrIncompleteCredentialFields, l)
 	}
-
-	rawDate := fields[1]
-	t, err := time.Parse(ShortTimeFormat, rawDate)
-	if err != nil {
-		return nil, fmt.Errorf("%w: err=%v", ErrCredentialParseTime, err)
-	}
-
 	return &Credential{
 		AccessKey: api.AccessKey(fields[0]),
-		Date:      t,
+		Date:      fields[1],
 		Region:    fields[2],
 		Service:   fields[3],
 		Suffix:    fields[4],
