@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/awsutl"
+	"github.com/bocchi-the-cache/indeep/internal/utils/awsutl"
 )
 
 const (

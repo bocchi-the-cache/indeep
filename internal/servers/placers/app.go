@@ -11,8 +11,8 @@ import (
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/fsmdb"
-	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/peers"
+	"github.com/bocchi-the-cache/indeep/internal/utils/hyped"
 )
 
 type placerServer struct {

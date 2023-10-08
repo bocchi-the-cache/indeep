@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/bocchi-the-cache/indeep/api"
-	"github.com/bocchi-the-cache/indeep/internal/httputl"
+	"github.com/bocchi-the-cache/indeep/internal/utils/httputl"
 )
 
 const (

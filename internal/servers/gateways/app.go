@@ -6,9 +6,9 @@ import (
 
 	"github.com/bocchi-the-cache/indeep/api"
 	"github.com/bocchi-the-cache/indeep/internal/clients"
-	"github.com/bocchi-the-cache/indeep/internal/hyped"
 	"github.com/bocchi-the-cache/indeep/internal/sigv4"
 	"github.com/bocchi-the-cache/indeep/internal/tenants"
+	"github.com/bocchi-the-cache/indeep/internal/utils/hyped"
 )
 
 type gateway struct {
