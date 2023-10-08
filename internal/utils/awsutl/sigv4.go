@@ -22,7 +22,7 @@ type checker struct {
 	codec   hyped.Codec
 }
 
-func NewSigV4Checker(tenants api.Tenants, codec hyped.Codec) api.SigChecker {
+func SigChecker(tenants api.Tenants, codec hyped.Codec) api.SigChecker {
 	return &checker{tenants, codec}
 }
 
@@ -37,34 +37,28 @@ func (c *checker) CheckSigV4(r *http.Request) (bool, error) {
 		return false, err
 	}
 
-	var canonicalHeaderList []string
+	var canonicalHeaderLines []string
 	for _, key := range auth.SignedHeaders {
 		value := r.Host
 		if key != "host" {
 			value = r.Header.Get(key)
 		}
-		canonicalHeaderList = append(
-			canonicalHeaderList,
-			fmt.Sprintf("%s:%s\n", key, strings.TrimSpace(value)),
-		)
+		canonicalHeaderLines = append(canonicalHeaderLines, fmt.Sprintf("%s:%s\n", key, strings.TrimSpace(value)))
 	}
-	canonicalHeaders := strings.Join(canonicalHeaderList, "")
 
 	canonicalRequest := strings.Join(
 		[]string{
 			r.Method,
 			r.URL.Path,
 			r.URL.RawQuery,
-			canonicalHeaders,
+			strings.Join(canonicalHeaderLines, ""),
 			strings.Join(auth.SignedHeaders, ";"),
 			auth.ContentHash,
 		},
 		"\n",
 	)
 	h := sha256.New()
-	if _, err := h.Write([]byte(canonicalRequest)); err != nil {
-		return false, err
-	}
+	h.Write([]byte(canonicalRequest))
 	hashedCanonicalRequest := hex.EncodeToString(h.Sum(nil))
 
 	date := auth.Credential.Date
@@ -72,15 +66,7 @@ func (c *checker) CheckSigV4(r *http.Request) (bool, error) {
 		[]string{
 			AuthScheme,
 			r.Header.Get(TimeKey),
-			strings.Join(
-				[]string{
-					date,
-					auth.Credential.Region,
-					auth.Credential.Service,
-					auth.Credential.Suffix,
-				},
-				"/",
-			),
+			strings.Join([]string{date, auth.Credential.Region, auth.Credential.Service, auth.Credential.Suffix}, "/"),
 			hashedCanonicalRequest,
 		},
 		"\n",
@@ -103,15 +89,14 @@ func hmacSHA256(key []byte, data string) []byte {
 
 func (c *checker) WithSigV4(f http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const status = http.StatusUnauthorized
 		ctx := hyped.NewContext(c.codec, w, r)
 		ok, err := c.CheckSigV4(r)
 		if err != nil {
-			ctx.Err(&Error{Status: status, Message: err.Error()})
+			ctx.Err(&Error{Status: http.StatusBadRequest, Message: err.Error()})
 			return
 		}
 		if !ok {
-			ctx.Err(&Error{Status: status, Message: "signature not matched"})
+			ctx.Err(&Error{Status: http.StatusUnauthorized, Message: "signature not matched"})
 			return
 		}
 		f(w, r)

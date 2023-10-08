@@ -26,7 +26,7 @@ func NewGateway(c *GatewayConfig) api.Server {
 	return &gateway{
 		config: c,
 		codec:  codec,
-		sigChk: awsutl.NewSigV4Checker(tenants.New(), codec),
+		sigChk: awsutl.SigChecker(tenants.New(), codec),
 	}
 }
 
