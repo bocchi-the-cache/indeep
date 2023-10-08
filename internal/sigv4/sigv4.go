@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -103,15 +102,15 @@ func hmacSHA256(key []byte, data string) []byte {
 
 func (c *checker) WithSigV4(f http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const code = http.StatusUnauthorized
+		const status = http.StatusUnauthorized
 		ctx := hyped.NewContext(c.codec, w, r)
 		ok, err := c.CheckSigV4(r)
 		if err != nil {
-			ctx.Err(hyped.WithStatusCode(err, code))
+			ctx.Err(&awsutl.Error{Status: status, Message: err.Error()})
 			return
 		}
 		if !ok {
-			ctx.Err(hyped.WithStatusCode(errors.New("signature not matched"), code))
+			ctx.Err(&awsutl.Error{Status: status, Message: "signature not matched"})
 			return
 		}
 		f(w, r)

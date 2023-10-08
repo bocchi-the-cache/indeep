@@ -42,25 +42,15 @@ func (c *context) OK(v any) {
 	c.write(http.StatusOK, data)
 }
 
-type Error struct {
-	Code    string `json:",omitempty" xml:",omitempty"`
-	Message string
-	Data    any
-}
-
 func (c *context) Err(err error) {
 	statusCode := http.StatusInternalServerError
-	var errData any
 	if c, ok := err.(StatusCoder); ok {
 		statusCode = c.StatusCode()
 	}
-	if v, ok := err.(ErrorData); ok {
-		errData = v.ErrorData()
-	}
-	data, err := c.c.Marshal(&Error{Message: err.Error(), Data: errData})
-	if err != nil {
+	data, marshalErr := c.c.Marshal(err)
+	if marshalErr != nil {
 		c.write(http.StatusInternalServerError, nil)
-		logs.S.Error("failed to marshal error response", "err", err)
+		logs.S.Error("failed to marshal error response", "err", marshalErr)
 		return
 	}
 	c.write(statusCode, data)
