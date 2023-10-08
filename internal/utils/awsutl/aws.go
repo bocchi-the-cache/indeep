@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	ErrUnknownAuthScheme          = errors.New("unknown authorization scheme")
+	ErrUnknownAuthScheme          = errors.New("unknown AWS authorization scheme")
 	ErrEmptyCredential            = errors.New("empty AWS credential")
 	ErrEmptySignedHeaders         = errors.New("empty AWS signed headers")
 	ErrEmptySignature             = errors.New("empty AWS signature")
@@ -108,7 +108,7 @@ func newHeaderAuthorization(a *httputl.Authorization) (*Authorization, error) {
 			}
 			auth.Credential = cred
 		case SignedHeadersEntryKey:
-			auth.SignedHeaders = strings.Split(strings.ToLower(value), ";")
+			auth.SignedHeaders = strings.Split(value, ";")
 		case SignatureEntryKey:
 			auth.Signature = value
 		}

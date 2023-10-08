@@ -22,10 +22,11 @@ type gateway struct {
 }
 
 func NewGateway(c *GatewayConfig) api.Server {
+	codec := hyped.XML()
 	return &gateway{
 		config: c,
-		codec:  hyped.XML(),
-		sigChk: sigv4.New(tenants.New()),
+		codec:  codec,
+		sigChk: sigv4.New(tenants.New(), codec),
 	}
 }
 
@@ -58,7 +59,7 @@ func (g *gateway) Setup() error {
 func (g *gateway) Host() string { return g.config.Host }
 
 func (g *gateway) DefineMux(mux *http.ServeMux) {
-	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
+	mux.HandleFunc("/", g.sigChk.WithSigV4(hyped.ProviderWith(g.codec, g.ListBuckets)))
 }
 
 func (g *gateway) Close() error { return nil }
