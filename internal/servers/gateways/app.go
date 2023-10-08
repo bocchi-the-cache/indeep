@@ -25,7 +25,7 @@ type gateway struct {
 func NewGateway(c *GatewayConfig) api.Server {
 	codec := hyped.XML()
 	return &gateway{
-		S3Mux:  awsutl.S3Mux(),
+		S3Mux:  new(awsutl.S3Mux),
 		config: c,
 		codec:  codec,
 		sigChk: awsutl.SigChecker(tenants.New(), codec),
