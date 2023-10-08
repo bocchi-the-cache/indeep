@@ -39,7 +39,7 @@ func (s *s3mux) parseApiID(r *http.Request) (api.S3ApiID, bool) {
 		}
 	}
 	if objectName == "" && bucketName == "" {
-		return api.ListBucketsID, true
+		return api.ListBuckets, true
 	}
 	return 0, false
 }

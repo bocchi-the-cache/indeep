@@ -13,7 +13,7 @@ type Gateway interface {
 type S3ApiID int
 
 const (
-	ListBucketsID S3ApiID = iota
+	ListBuckets S3ApiID = iota
 
 	S3ApiMaxSize
 )

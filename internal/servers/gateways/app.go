@@ -63,7 +63,7 @@ func (g *gateway) Setup() error {
 func (g *gateway) Host() string { return g.config.Host }
 
 func (g *gateway) defineMux() {
-	g.S3Mux.HandleFunc(api.ListBucketsID, g.sigChk.WithSigV4(hyped.ProviderWith(g.codec, g.ListBuckets)))
+	g.S3Mux.HandleFunc(api.ListBuckets, g.sigChk.WithSigV4(hyped.ProviderWith(g.codec, g.ListBuckets)))
 }
 
 func (g *gateway) Close() error { return nil }
