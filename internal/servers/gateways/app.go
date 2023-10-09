@@ -16,7 +16,7 @@ type gateway struct {
 	config   *GatewayConfig
 	codec    hyped.Codec
 	sigChk   api.SigChecker
-	mux      httputl.Router
+	router   httputl.Router
 	server   *http.Server
 	placerCl api.Placer
 	metaCl   api.MetaService
@@ -55,7 +55,7 @@ func (g *gateway) Setup() error {
 	}
 	g.placerCl = placerCl
 
-	g.mux = &awsutl.S3Mux{
+	g.router = &awsutl.S3Router{
 		ListBuckets: g.sigChk.WithSigV4(hyped.ProviderWith(g.codec, g.ListBuckets)),
 	}
 
@@ -67,7 +67,7 @@ func (g *gateway) Host() string { return g.config.Host }
 func (g *gateway) Close() error { return nil }
 
 func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if fn := g.mux.Route(r); fn != nil {
+	if fn := g.router.Route(r); fn != nil {
 		fn(w, r)
 		return
 	}

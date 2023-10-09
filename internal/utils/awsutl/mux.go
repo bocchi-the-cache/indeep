@@ -5,14 +5,14 @@ import (
 	"strings"
 )
 
-type S3Mux struct {
+type S3Router struct {
 	ListBuckets http.HandlerFunc
 }
 
-func (m *S3Mux) Route(r *http.Request) http.HandlerFunc {
+func (r *S3Router) Route(req *http.Request) http.HandlerFunc {
 	var bucketName, objectName string
 	{
-		parts := strings.SplitN(strings.TrimLeft(r.URL.Path, "/"), "/", 2)
+		parts := strings.SplitN(strings.TrimLeft(req.URL.Path, "/"), "/", 2)
 		switch len(parts) {
 		case 1:
 			bucketName = parts[0]
@@ -22,15 +22,15 @@ func (m *S3Mux) Route(r *http.Request) http.HandlerFunc {
 		}
 	}
 	if objectName == "" && bucketName == "" {
-		return m.routeMyOperations(r)
+		return r.routeMyOperations(req)
 	}
 	return nil
 }
 
-func (m *S3Mux) routeMyOperations(r *http.Request) http.HandlerFunc {
-	switch r.Method {
+func (r *S3Router) routeMyOperations(req *http.Request) http.HandlerFunc {
+	switch req.Method {
 	case http.MethodGet:
-		return m.ListBuckets
+		return r.ListBuckets
 	default:
 		return nil
 	}
