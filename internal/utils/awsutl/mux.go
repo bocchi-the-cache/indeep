@@ -21,7 +21,7 @@ func (r *S3Router) Route(req *http.Request) http.HandlerFunc {
 			objectName = parts[1]
 		}
 	}
-	if objectName == "" && bucketName == "" {
+	if bucketName == "" && objectName == "" {
 		return r.routeMyOperations(req)
 	}
 	return nil
