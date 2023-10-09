@@ -69,8 +69,8 @@ func (m *metaserver) Setup() error {
 
 func (m *metaserver) Host() string { return m.config.Host }
 
+func (m *metaserver) Close() error { return nil }
+
 func (m *metaserver) DefineMux(mux *http.ServeMux) {
 	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {})
 }
-
-func (m *metaserver) Close() error { return nil }

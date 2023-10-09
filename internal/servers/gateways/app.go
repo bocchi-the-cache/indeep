@@ -8,14 +8,15 @@ import (
 	"github.com/bocchi-the-cache/indeep/internal/clients"
 	"github.com/bocchi-the-cache/indeep/internal/tenants"
 	"github.com/bocchi-the-cache/indeep/internal/utils/awsutl"
+	"github.com/bocchi-the-cache/indeep/internal/utils/httputl"
 	"github.com/bocchi-the-cache/indeep/internal/utils/hyped"
 )
 
 type gateway struct {
-	api.S3Mux
 	config   *GatewayConfig
 	codec    hyped.Codec
 	sigChk   api.SigChecker
+	mux      httputl.Router
 	server   *http.Server
 	placerCl api.Placer
 	metaCl   api.MetaService
@@ -25,7 +26,6 @@ type gateway struct {
 func NewGateway(c *GatewayConfig) api.Server {
 	codec := hyped.XML()
 	return &gateway{
-		S3Mux:  new(awsutl.S3Mux),
 		config: c,
 		codec:  codec,
 		sigChk: awsutl.SigChecker(tenants.New(), codec),
@@ -55,15 +55,21 @@ func (g *gateway) Setup() error {
 	}
 	g.placerCl = placerCl
 
-	g.defineMux()
+	g.mux = &awsutl.S3Mux{
+		ListBuckets: g.sigChk.WithSigV4(hyped.ProviderWith(g.codec, g.ListBuckets)),
+	}
 
 	return nil
 }
 
 func (g *gateway) Host() string { return g.config.Host }
 
-func (g *gateway) defineMux() {
-	g.S3Mux.HandleFunc(api.ListBuckets, g.sigChk.WithSigV4(hyped.ProviderWith(g.codec, g.ListBuckets)))
-}
-
 func (g *gateway) Close() error { return nil }
+
+func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if fn := g.mux.Route(r); fn != nil {
+		fn(w, r)
+		return
+	}
+	httputl.NotImplemented(w, r)
+}

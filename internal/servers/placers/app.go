@@ -108,12 +108,12 @@ func (s *placerServer) Setup() error {
 
 func (s *placerServer) Host() string { return s.config.Host }
 
+func (s *placerServer) Close() error {
+	return errors.Join(s.db.Close(), s.rn.Shutdown().Error())
+}
+
 func (s *placerServer) DefineMux(mux *http.ServeMux) {
 	mux.HandleFunc(api.RpcMemberAskLeaderID.Path(), hyped.Provider(s.AskLeaderID))
 	mux.HandleFunc(api.RpcPlacerListGroups.Path(), hyped.LeaderProvider(s, s.ListGroups))
 	mux.HandleFunc(api.RpcPlacerGenerateGroup.Path(), hyped.LeaderProvider(s, s.GenerateGroup))
-}
-
-func (s *placerServer) Close() error {
-	return errors.Join(s.db.Close(), s.rn.Shutdown().Error())
 }

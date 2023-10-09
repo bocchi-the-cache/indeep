@@ -28,3 +28,11 @@ func NewAuthorization(header http.Header) (*Authorization, error) {
 
 	return &Authorization{Scheme: raws[0], Credential: raws[1]}, nil
 }
+
+type Router interface {
+	Route(r *http.Request) http.HandlerFunc
+}
+
+func NotImplemented(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
