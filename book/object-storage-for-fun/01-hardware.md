@@ -28,13 +28,10 @@
 
 当然了，这里只是典型业务需求的参考值。如果扩大集群磁盘数量、使用更好的 SSD，都会提高集群的性能上限。
 
-
-## 2 整体方案
-
 遗憾的是，地球人在 2025 年广泛使用的计算机架构仍然是冯诺依曼机，离不开 CPU、内存、磁盘、网络等几大件。
 无论是服务器、消费级 PC 和智能手机，差别在于性能的高低（以及有多少预算）。
 
-### 2.1 超高性能: 高速 SSD 与 RDMA 网络
+## 2 超高性能: 高速 SSD 与 RDMA 网络
 
 LLM 训练和推理的存储、虚拟机集群的块存储等需求，对存储系统的性能要求很高。这些应用舍得花费成本，追求极低延迟和巨大吞吐。
 
@@ -48,7 +45,7 @@ LLM 训练和推理的存储、虚拟机集群的块存储等需求，对存储�
 2025 年开源的 3FS 存储系统就是原生基于现代 NVMe SSD 和 RDMA 网络构建。其使用的集群为 180 台机器，单机规格为 2×200Gbps InfiniBand 网卡 + 16×14TiB NVMe SSD。压测环境吞吐达到了 6.6 TiB/s。[5]
 
 
-#### PCIe 5.0 与 NVMe SSD
+### 2.1 PCIe 5.0 与 NVMe SSD
 既然是旗舰性能，自然少不了 PCIe 5.0 SSD 的加持。自己组装过主机的玩家可能知道，PCIe 每一代的前进基本都代表着总线带宽翻倍提升。
 
 那么问题来了，什么是 PCIe，什么又是 NVMe？
@@ -76,7 +73,7 @@ LLM 训练和推理的存储、虚拟机集群的块存储等需求，对存储�
 ![](https://static.zdfmc.net/imgs/2025/03/17e840857eb1678227a97456c4a7dcae.png)
 图: U.2 接口的企业级 SSD，不会使用消费级常见的 `m.2` 规格，为了保证散热和可靠性，一般是 `E3.S 7.5mm` / `U.2 15mm`。
 
-#### NVMe 也代表着存储软件栈的革新
+### 2.2 NVMe 也代表着存储软件栈的革新
 NVMe 不仅是概念上的变化，kernel 中的驱动也是原生面向 SSD 设备设计的。下表是 与 AHCI (SATA) 的特性对比。
 
 ![](https://static.zdfmc.net/imgs/2025/03/1d7a9e6135bcd551762c761bfd84ba66.png)表: AHCI 和 NVMe 对比 [7]
@@ -89,30 +86,119 @@ AHCI 面向旋转的机械硬盘设计，单队列、深度 32 对于 15000 RPM 
 
 因此，高性能存储基础设施的发展，包含了硬件的软件的共同发展，为上层构建超高性能分布式存储提供了舞台。
 
-#### 高速网络与 RDMA
+### 2.3 高速网络与 RDMA
 
-支持 RDMA 的网卡
+网卡规格达到 100 Gbps 后，为了追求极限性能，需要配合 RDMA 技术使用。RDMA（Remote Direct Memory Access，远程直接内存访问）
 
-Why RDMA / 代价
+如果你问颇有经验的开发者，为啥非要使用 RDMA 不可？他们多半的回答是为了绕过操作系统内核和CPU，直接在应用程序内存之间进行数据传输。这个系统内核态的消耗究竟有多大呢？
 
-微软 RDMA 论文
+我们使用一个没那么恰当的例子，观察用户态函数切换和内核态系统调用的消耗。
+```
+#include <iostream>
+#include <chrono>
+#include <unistd.h>
+
+const int ITERATIONS = 1000000;
+
+// 阻止编译器优化用户态函数
+__attribute__((noinline)) void user_space_call() {
+    // 模拟与 getpid 相当的轻量级操作
+    static volatile int counter = 0; // volatile 防止优化
+    counter += 1;                   // 简单算术运算
+    asm volatile("" : "+r" (counter) : : "memory"); // 确保内存屏障
+}
+
+void kernel_mode_test() {
+    volatile pid_t dummy; // 防止编译器优化系统调用
+    
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < ITERATIONS; ++i) {
+        dummy = getpid(); // 系统调用
+    }
+    auto end = std::chrono::steady_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    std::cout << "内核态调用总耗时: " << duration << " μs | 单次开销: " 
+              << static_cast<double>(duration)/ITERATIONS << " μs\n";
+}
+
+void user_mode_test() {
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < ITERATIONS; ++i) {
+        user_space_call(); // 用户态调用
+    }
+    auto end = std::chrono::steady_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    std::cout << "用户态调用总耗时: " << duration << " μs | 单次开销: " 
+              << static_cast<double>(duration)/ITERATIONS << " μs\n";
+}
+
+int main() {
+    std::cout << "--- 用户态/内核态切换开销测试 ---\n";
+    user_mode_test();
+    kernel_mode_test();
+    
+    return 0;
+}
+```
+
+```
+g++ -O0 -o sys_call_bench sys_call_bench.cc
+```
+
+得到的耗时对比如下：
+
+```
+--- 用户态/内核态切换开销测试 ---
+用户态调用总耗时: 7139 μs | 单次开销: 0.007139 μs
+内核态调用总耗时: 199932 μs | 单次开销: 0.199932 μs
+```
+
+这非常直观地说明了如果通过完全内核去收发网络包、多了几次内存拷贝和中断，可能还真会 hang 死用户的虚拟机磁盘。所以还真是不得不使用 RDMA 技术了。
+
+常见的网络技术有：
+- **InfiniBand**：原生支持RDMA，提供低延迟和高吞吐。
+- **RoCE**（RDMA over Converged Ethernet）：在以太网上实现RDMA，兼容现有网络设施。
+- **iWARP**：通过TCP实现RDMA，适合广域网场景。
+
+除了时延和性能的提升，RDMA 技术还有一个很大的好处是节省了 CPU。对于大型集群，节省的 CPU 可以直接用来跑一些离线计算任务，提高整个集群的利用率。
+
+那么挑战是什么呢？
+
+需要专有的硬件网卡和交换机。比如 RoCE，需要无损网络和流量控制算法。这就意味着开发者不能像基于 kernel tcp/ip 编程那么畅快。网络性能观测、甚至基础设施交换机硬件的兼容性都要开发者面面俱到。
+
+Azure Storage 大范围使用 RDMA 流量的论文 [9] 中，除了描述其带来的收益外，也花了大幅篇幅描述了他们遇到的挑战：
+- 需要编写基于 RDMA 的通信框架，支持失败时候回退到 tcp
+- 紧密观测基础设施 RDMA 流量网络交换的性能指标，防御暂停帧风暴等事件
+- 推动网络硬件供应商更新固件解决现有的兼容和性能问题
+
+![](https://static.zdfmc.net/imgs/2025/03/536302c08a4891c948c89c96a0c48b30.png)
+图: RDMA vs TCP - Azure with RDMA on NSDI '23 (老哥确实想展示一下自己刚提的新车) [9]
 
 
+## 3 一般性能: 成本、性能和规模的权衡
 
-### 2.2 一般性能: 成本、性能和规模的权衡
+对象存储一般用于存储媒体资源，在这个看中成本的年代，首要追求低成本，高容量、追求性能和成本的平衡。
+比如多媒体资源、用户 KYC 归档。单集群数据量应当是 PiB 起步。大公司的多租户集群甚至能到 EiB 级别 [10]。
 
-追求性能和成本的平衡。
+### 3.1 HDD 容量为王: 你现在知道谁是老大了吼
 
-对象存储一般用于存储媒体资源，首要追求成本合适，高容量。
+### 3.2 适当的 SSD
 
-- 媒体资源一般和 CDN 配合使用
+### 3.3 线性扩展能力
+媒体资源一般和 CDN 配合使用，因此一般不会对少量文件进行高 IOPS 热点读写。
 - 性能取决于数据分片所在的硬件能力
 - 数据存储：副本与 EC
+
+### 3.4 Raid 卡不只能做 Raid
 
 
 ### 2.3 成本优先: 机器老了点，又不是不能存
 
 故障率偏高，用于冷存。大型 EC 分片、减少修复 LRC 算法
+
+### 2.4 大规模冷存储: 磁带
 
 
 ## 硬盘
@@ -166,3 +252,5 @@ Linus: AVX is shit
 [6] [solidigm ps1010 ssd review - storagereview.com](https://www.storagereview.com/review/solidigm-ps1010-ssd-review)
 [7] [AHCI vs NVMe - Phison Blog](https://phisonblog.com/ahci-vs-nvme-the-future-of-ssds-2/)
 [8] [Solid-state storage devices and the block layer](https://lwn.net/Articles/408428/)
+[9] [Empowering Azure Storage with RDMA](https://www.usenix.org/conference/nsdi23/presentation/bai)
+[10] [Facebook’s Tectonic Filesystem: Efficiency from Exascale](https://www.usenix.org/system/files/fast21-pan.pdf)
