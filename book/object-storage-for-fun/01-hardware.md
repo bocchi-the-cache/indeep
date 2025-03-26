@@ -173,8 +173,6 @@ Azure Storage 大范围使用 RDMA 流量的论文 [9] 中，除了描述其带�
 - 紧密观测基础设施 RDMA 流量网络交换的性能指标，防御暂停帧风暴等事件
 - 推动网络硬件供应商更新固件解决现有的兼容和性能问题
 
-![](https://static.zdfmc.net/imgs/2025/03/536302c08a4891c948c89c96a0c48b30.png)
-图: RDMA vs TCP - Azure with RDMA on NSDI '23 (老哥确实想展示一下自己刚提的新车) [9]
 
 
 ## 3 一般性能: 成本、性能和规模的权衡
@@ -183,15 +181,47 @@ Azure Storage 大范围使用 RDMA 流量的论文 [9] 中，除了描述其带�
 比如多媒体资源、用户 KYC 归档。单集群数据量应当是 PiB 起步。大公司的多租户集群甚至能到 EiB 级别 [10]。
 
 ### 3.1 HDD 容量为王: 你现在知道谁是老大了吼
+![](https://static.zdfmc.net/imgs/2025/03/a9a02823520d9bddc514088e28a8ae83.png)
+
+注重成本的存储，短期看来机械硬盘还无法被取代。近些年，机械硬盘的单机的存储密度逐渐上升。我们以单存储服务器挂载 18x 22TiB HDD，单机架 10 台服务器，这个机架的容量将来到 3.9PiB。
+
+应该配备什么规格的网卡？我们仍然以单机 18 块 HDD 推算，其满载读写为 18 * 100MB/s ~ 14.4Gbps。即使给后台的修复流量和均衡容量预留一定冗余，25Gbps 的网卡即绰绰有余。
 
 ### 3.2 适当的 SSD
+在大规模对象存储中，可以在机器上配比一些 SSD 作为读写缓存，对集群的峰值吞吐和小文件 iops 都有比较大的帮助。
+
+对于写，常见的一种做法可以将所有写转为 journal log 顺序写，同时落盘到机械硬盘上。如果用户倾向于读刚刚写入的文件，这种做法收益也很大。
+
+对于读，媒体资源一般和 CDN 配合使用，因此一般不会对少量文件进行高 IOPS 热点读写。可以构建一层 LRU cache，加速用户的热点读请求。
 
 ### 3.3 线性扩展能力
-媒体资源一般和 CDN 配合使用，因此一般不会对少量文件进行高 IOPS 热点读写。
-- 性能取决于数据分片所在的硬件能力
-- 数据存储：副本与 EC
+
+集群的容量可以随着磁盘数量的扩增，容易理解。但是集群的读写性能的提高是有条件的。
+
+分布式存储的根本原理，其实也是所有分布式系统最最根本的两种手段 [11]：
+**复制 (replicate)** 
+将用户数据复制多份。最简单的例子是将数据成两副本，分别存在不同的单机上。如此我们就可以容忍其中一台机器的故障，并抓紧时间修复。
+值得注意的是，复制的份数越多，可容忍同时损坏的数量越多，数据的安全性就越有保障。当丢失数据的概率小于一定程度的 0.00(...)1% 后，我们在工程上就认为数据几乎不可能丢失，可靠性达到了 99.99(...)9%。
+
+**分区 (partition)**
+分区在不同的分布式系统中含义不同。对于存储系统，可以是将用户数据的不同端分散到不同的机器上。
+如果我们使用 EC 冗余算法，针对 k 个原始数据算出 m 个冗余数据，将 k+m 个数据一起存储。则其中k+m 可以容忍丢失任意 m 个。
+
+因此，存储系统的 **热点读写最大性能不会超过数据复制和分区所在硬盘的极限性能**。
+
+举个例子，假设你使用对象存储集群，使用两副本存储。虽然集群高达 PiB 级别，若未经缓存优化，你疯狂读取单文件的最大速度不会超过两个磁盘极限性能之和。这也是所有云厂商的对象存储都会提醒你，热点读性能有限的原因。
+
+读热点问题的解决可以通过增加 内存 / SSD 读缓存，或暴力增大副本数量环节，但终归和集群规模不是线性增长的。
+
+写热点经过合理设计，是可以做到随集群规模线性上升的。比如一个 append-only 的存储系统，用户写操作可以在任意一组复制组上，完成写后提交元数据系统。
+
+![](https://static.zdfmc.net/imgs/2025/03/9af59afa80d0b855efd2759ffc89f656.png)
+图：集群单一读取点和大量写入点性能
+
 
 ### 3.4 Raid 卡不只能做 Raid
+
+### 3.5 数据的降冷操作
 
 
 ### 2.3 成本优先: 机器老了点，又不是不能存
@@ -248,9 +278,17 @@ Linus: AVX is shit
 
 ## 参考资料
 [4] [Dell PowerEdge R960 Product Page](https://www.dell.com/zh-cn/shop/cty/pdp/spd/poweredge-r960/asper960)
+
 [5] [deepseek-ai/3FS](https://github.com/deepseek-ai/3FS)
+
 [6] [solidigm ps1010 ssd review - storagereview.com](https://www.storagereview.com/review/solidigm-ps1010-ssd-review)
+
 [7] [AHCI vs NVMe - Phison Blog](https://phisonblog.com/ahci-vs-nvme-the-future-of-ssds-2/)
+
 [8] [Solid-state storage devices and the block layer](https://lwn.net/Articles/408428/)
+
 [9] [Empowering Azure Storage with RDMA](https://www.usenix.org/conference/nsdi23/presentation/bai)
+
 [10] [Facebook’s Tectonic Filesystem: Efficiency from Exascale](https://www.usenix.org/system/files/fast21-pan.pdf)
+
+[11] [Distributed systems for fun and profit](https://book.mixu.net/distsys/single-page.html)
