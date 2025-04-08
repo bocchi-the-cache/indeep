@@ -1,7 +1,7 @@
 pub mod config;
 pub mod storage;
 
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 use axum::{response::Html, routing::get, Router};
 
 #[tokio::main]
@@ -21,7 +21,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     axum::serve(listener, app).await?;
 
+
+    let storage = Arc::new(tokio::sync::RwLock::new(storage::Storage::new()));
+    {
+        let mut storage_lock = storage.write().await;
+        storage_lock.init(Path::new("data.db")).await?;
+    }
+
+    // forever write to the storage
+    loop {
+        storage.read().await.write().await?;
+        
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    }
+
+    
+    println!("Storage initialized with data path: {}", "data.db");
+
     Ok(())
+
+
+
 }
 
 async fn handler() -> Html<&'static str> {
